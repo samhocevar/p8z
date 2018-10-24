@@ -1,15 +1,16 @@
 #!/bin/sh
 
 PATH="$PATH:$HOME/zepto8"
+TMPFILE=.p8z-temp.p8
 
 # Inspect p8z.p8 for stats
 echo "# Inspecting: p8z.p8"
-z8tool --inspect p8z.p8
+cat p8z.p8 | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . > "$TMPFILE"
+z8tool --inspect "$TMPFILE"
 echo ""
 
 # Check that the code works
 test_string() {
-  TMPFILE=.p8z-temp.p8
   STR="$1"
   echo "# Compressing string: '$STR'"
 
@@ -34,4 +35,6 @@ test_string "to be or not to be or to be or maybe not to be or maybe finally to 
 #        (cat $(TMPDATA) | dd bs=1 skip=17152; echo '') | od -v -An -x --endian=little \
 #          | xargs -n2 | awk '{ print "0x"$$2"."$$1"," }' | sed 's/0*,/,/ ; s/0x00*/0x/g' \
 #          | xargs -n 6 | tr -d ' ' >> $(TMPCART2)
+
+rm -f "$TMPFILE"
 

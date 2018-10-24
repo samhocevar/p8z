@@ -107,11 +107,9 @@ local function hufftable_create(table,depths,nvalues)
       next_code[len] = next_code[len] + 1
       local code0 = shl(code,nbits-len)
       local code1 = shl(code+1,nbits-len)
--- xxx: begin remove
-      if code1 > shl(1,nbits) then
-        error("code error")
-      end
--- xxx: end remove
+      if code1 > shl(1,nbits) then -- debug
+        error("code error")        -- debug
+      end                          -- debug
       for j=code0,code1-1 do
         table[j] = e
       end
@@ -197,10 +195,8 @@ local function inflate_block_dynamic(bs)
         depths[i] = c
         i += 1
       end
--- xxx: begin remove
-    else
-      error("wrong entry in depth table for literal/length alphabet: "..v);
--- xxx: end remove
+    else                                                                   -- debug
+      error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
     end
   end
   for i=1,hlit do litdepths[i] = depths[i] end
@@ -233,17 +229,13 @@ end
 local function inflate_block_uncompressed(bs)
   bs:flushb(band(bs.n,7))
   local len = bs:getb(16)
--- xxx: begin remove
-  if bs.n > 0 then
-    error("unexpected.. should be zero remaining bits in buffer.")
-  end
--- xxx: end remove
+  if bs.n > 0 then                                                 -- debug
+    error("unexpected.. should be zero remaining bits in buffer.") -- debug
+  end                                                              -- debug
   local nlen = bs:getb(16)
--- xxx: begin remove
-  if bxor(len,nlen) != 65535 then
-    error("len and nlen don't match")
-  end
--- xxx: end remove
+  if bxor(len,nlen) != 65535 then     -- debug
+    error("len and nlen don't match") -- debug
+  end                                 -- debug
   for i=0,len-1 do
     bs:write(bs.data[bs.pos+i])
   end
@@ -261,10 +253,8 @@ local function inflate_main(bs)
       inflate_block_static(bs)
     elseif type == 2 then
       inflate_block_dynamic(bs)
--- xxx: begin remove
-    else
-      error("unsupported block type")
--- xxx: end remove
+    else                              -- debug
+      error("unsupported block type") -- debug
     end
   until last == 1
   bs:flushb(band(bs.n,7))
