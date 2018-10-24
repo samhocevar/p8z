@@ -7,7 +7,7 @@ local reverse = {}
 local function bs_init(data)
   local bs = {
     data = data, -- char buffer
-    pos = 0,     -- char buffer index
+    pos = 1,     -- char buffer index
     b = 0,       -- bit buffer
     n = 0,       -- number of bits in buffer
     out = {},    -- output array
@@ -251,12 +251,6 @@ local function inflate_block_uncompressed(bs)
 end
 
 local function inflate_main(bs)
--- xxx: begin remove
-  if bs.data[bs.pos]!=0x78 then
-    error("no zlib header found")
-  end
--- xxx: end remove
-  bs.pos += 2
   repeat
     local block
     last = bs:getb(1)
