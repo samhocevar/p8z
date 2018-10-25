@@ -26,8 +26,7 @@ local function bs_init(data)
       self.n += 8
     end
     local ret = shl(band(self.b,shl(0x.0001,n)-0x.0001),16)
-    self.n -= n
-    self.b = shr(self.b,n)
+    bs:flushb(n)
     return ret
   end
   -- get next variable-size of maximum size=n element from stream, according to huffman table
@@ -41,8 +40,7 @@ local function bs_init(data)
     local l = reverse[band(shl(self.b,8),0xff)]
     local v = band(shr(shl(h,8)+l,16-n),shl(1,n)-1)
     local e = hufftable[v]
-    self.n -= e%16
-    self.b = shr(self.b,e%16)
+    bs:flushb(e%16)
     return flr(e/16)
   end
   function bs:write(n)
@@ -139,7 +137,7 @@ local function inflate_block_loop(bs,nlit,ndist)
       if v < 4 then
         dist += v
       else
-        nbits = flr(shr(v-2,1))
+        nbits = flr(v/2-1)
         dist += shl(band(v,1)+2,nbits)
         dist += bs:getb(nbits)
       end
