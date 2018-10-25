@@ -41,11 +41,9 @@ local function bs_init(data)
     local l = reverse[band(shl(self.b,8),0xff)]
     local v = band(shr(shl(h,8)+l,16-n),shl(1,n)-1)
     local e = hufftable[v]
-    local len = band(e,15)
-    local ret = flr(shr(e,4))
-    self.n -= len
-    self.b = shr(self.b,len)
-    return ret
+    self.n -= e%16
+    self.b = shr(self.b,e%16)
+    return flr(e/16)
   end
   function bs:write(n)
     local d = band(self.outpos, 0.75)
@@ -78,22 +76,19 @@ local function bs_init(data)
   return bs
 end
 
-local bl_count = {}
-local next_code = {}
-
 local function hufftable_create(table,depths,nvalues)
+  local bl_count = {}
   local nbits = 1
   for i=0,16 do
     bl_count[i] = 0
   end
   for i=1,nvalues do
     local d = depths[i]
-    if d > nbits then
-      nbits = d
-    end
+    nbits = max(nbits, d)
     bl_count[d] += 1
   end
   local code = 0
+  local next_code = {}
   bl_count[0] = 0
   for i=1,nbits do
     code = (code + bl_count[i-1]) * 2
@@ -102,16 +97,14 @@ local function hufftable_create(table,depths,nvalues)
   for i=1,nvalues do
     local len = depths[i] or 0
     if len > 0 then
-      local e = (i-1)*16 + len
-      local code = next_code[len]
-      next_code[len] = next_code[len] + 1
-      local code0 = shl(code,nbits-len)
-      local code1 = shl(code+1,nbits-len)
+      local code0 = shl(next_code[len],nbits-len)
+      next_code[len] += 1
+      local code1 = shl(next_code[len],nbits-len)
       if code1 > shl(1,nbits) then -- debug
         error("code error")        -- debug
       end                          -- debug
       for j=code0,code1-1 do
-        table[j] = e
+        table[j] = (i-1)*16 + len
       end
     end
   end
