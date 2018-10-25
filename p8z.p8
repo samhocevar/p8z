@@ -3,6 +3,7 @@ version 16
 __lua__
 
 local reverse = {}
+local methods = {}
 
 local function bs_init(data)
   local bs = {
@@ -154,16 +155,13 @@ local lengthtable = {}
 local litdepths = {}
 local distdepths = {}
 
-local function inflate_block_dynamic(bs)
+-- inflate dynamic block
+methods[2] = function(bs)
   local hlit = 257 + bs:getb(5)
   local hdist = 1 + bs:getb(5)
   local hclen = 4 + bs:getb(4)
-  for i=1,hclen do
-    local v = bs:getb(3)
-    depths[order[i]] = v
-  end
-  for i=hclen+1,19 do
-    depths[order[i]] = 0
+  for i=1,19 do
+    depths[order[i]] = i>hclen and 0 or bs:getb(3)
   end
   local nlen = hufftable_create(lengthtable,depths,19)
   local i=1
@@ -200,7 +198,8 @@ end
 local stcnt = { 144, 112, 24, 8 }
 local stdpt = { 8, 9, 7, 8 }
 
-local function inflate_block_static(bs)
+-- inflate static block
+methods[1] = function(bs)
   local k = 1
   for i=1,4 do
     local d = stdpt[i]
@@ -217,14 +216,17 @@ local function inflate_block_static(bs)
   inflate_block_loop(bs,nlit,ndist,littable,disttable)
 end
 
-local function inflate_block_uncompressed(bs)
+-- inflate uncompressed byte array
+methods[0] = function(bs)
+  -- align input buffer to byte (as per spec)
+  -- fixme: we could omit this!
   bs:flushb(band(bs.n,7))
   local len = bs:getb(16)
   if bs.n > 0 then                                                 -- debug
     error("unexpected.. should be zero remaining bits in buffer.") -- debug
   end                                                              -- debug
   local nlen = bs:getb(16)
-  if bxor(len,nlen) != 65535 then     -- debug
+  if bxor(len,nlen) != 0xffff then    -- debug
     error("len and nlen don't match") -- debug
   end                                 -- debug
   for i=0,len-1 do
@@ -233,27 +235,19 @@ local function inflate_block_uncompressed(bs)
   bs.pos += len
 end
 
-local function inflate_main(bs)
-  repeat
-    local block
-    last = bs:getb(1)
-    type = bs:getb(2)
-    if type == 0 then
-      inflate_block_uncompressed(bs)
-    elseif type == 1 then
-      inflate_block_static(bs)
-    elseif type == 2 then
-      inflate_block_dynamic(bs)
-    else                              -- debug
-      error("unsupported block type") -- debug
-    end
-  until last == 1
-  bs:flushb(band(bs.n,7))
-  return bs.out
-end
+-- block type 3 does not exist
+methods[3] = function()           -- debug
+  error("unsupported block type") -- debug
+end                               -- debug
 
 function inflate(data)
-  return inflate_main(bs_init(data))
+  local bs = bs_init(data)
+  repeat
+    last = bs:getb(1)
+    methods[bs:getb(2)](bs)
+  until last == 1
+  bs:flushb(band(bs.n,7))  -- debug (no need to flush!)
+  return bs.out
 end
 
 -- init reverse array
