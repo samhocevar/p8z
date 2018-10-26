@@ -47,7 +47,7 @@ local function bs_init(data)
     return flr(t[v]/16)
   end
   function bs:write(n)
-    local d = band(self.outpos,.75)
+    local d = self.outpos%1
     local off = flr(self.outpos)
     if d==0 then
       n=shr(n,16)
@@ -63,8 +63,8 @@ local function bs_init(data)
     self.outpos += .25
   end
   function bs:readback(off)
-    local d = band(self.outpos + off * .25,.75)
-    local n = self.out[flr(self.outpos + off * .25)]
+    local d = (self.outpos+off/4)%1
+    local n = self.out[flr(self.outpos+off/4)]
     if d==0 then
       n=shl(n,16)
     elseif d==.25 then
@@ -211,7 +211,7 @@ end
 methods[0] = function(bs)
   -- align input buffer to byte (as per spec)
   -- fixme: we could omit this!
-  bs:flushb(band(bs.n,7))
+  bs:flushb(bs.n%8)
   local len = bs:getb(16)
   if bs.n > 0 then                                                 -- debug
     error("unexpected.. should be zero remaining bits in buffer.") -- debug
@@ -237,7 +237,7 @@ function inflate(data)
     last = bs:getb(1)
     methods[bs:getb(2)](bs)
   until last == 1
-  bs:flushb(band(bs.n,7))  -- debug (no need to flush!)
+  bs:flushb(bs.n%8)  -- debug (no need to flush!)
   return bs.out
 end
 
