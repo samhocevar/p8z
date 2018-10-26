@@ -9,7 +9,7 @@ local function bs_init(data)
   local bs = {
     data = data, -- char buffer
     pos = 1,     -- char buffer index
-    b = 0,       -- bit buffer
+    b = 0,       -- bit buffer, starting from bit 0 (= 0x.0001)
     n = 0,       -- number of bits in buffer
     out = {},    -- output array
     outpos = 0,  -- output position
@@ -26,23 +26,25 @@ local function bs_init(data)
       self.pos += 1
       self.n += 8
     end
-    local ret = shl(band(self.b,shl(0x.0001,n)-0x.0001),16)
+    local ret = band(shl(self.b,16),2^n-1)
     bs:flushb(n)
     return ret
   end
   -- get next variable-size of maximum size=n element from stream, according to huffman table
   function bs:getv(t,n)
+    -- require at least n bits, even if p<n bytes may be actually consumed
     while self.n < n do
       self.b += shr(self.data[self.pos],16-self.n)
       self.pos += 1
       self.n += 8
     end
+    -- reverse using a 16-bit word
+    -- fixme: maybe we could get rid of reversing in the encoder?
     local h = reverse[band(shl(self.b,16),255)]
     local l = reverse[band(shl(self.b,8),255)]
-    local v = band(shr(shl(h,8)+l,16-n),shl(1,n)-1)
-    local e = t[v]
-    bs:flushb(e%16)
-    return flr(e/16)
+    local v = band(shr(256*h+l,16-n),2^n-1)
+    bs:flushb(t[v]%16)
+    return flr(t[v]/16)
   end
   function bs:write(n)
     local d = band(self.outpos,.75)
