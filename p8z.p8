@@ -197,16 +197,10 @@ end
 -- inflate static block
 methods[1] = function(bs)
   local depths = {}
-  local stcnt = { 18, 14, 3, 1 }
-  for i=1,4 do
-    for j=1,8*stcnt[i] do
-      add(depths,7+i%3)
-    end
-  end
+  for i=1,288 do depths[i]=8 end
+  for i=145,280 do depths[i]+=sgn(256-i) end
   local nlit = construct(littable,depths,288)
-  for i=1,32 do
-    depths[i] = 5
-  end
+  for i=1,32 do depths[i]=5 end
   local ndist = construct(disttable,depths,32)
   inflate_block_loop(bs,nlit,ndist,littable,disttable)
 end
