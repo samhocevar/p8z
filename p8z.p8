@@ -31,7 +31,7 @@ local function bs_init(data)
     return ret
   end
   -- get next variable-size of maximum size=n element from stream, according to huffman table
-  function bs:getv(hufftable,n)
+  function bs:getv(t,n)
     while self.n < n do
       self.b += shr(self.data[self.pos],16-self.n)
       self.pos += 1
@@ -40,7 +40,7 @@ local function bs_init(data)
     local h = reverse[band(shl(self.b,16),0xff)]
     local l = reverse[band(shl(self.b,8),0xff)]
     local v = band(shr(shl(h,8)+l,16-n),shl(1,n)-1)
-    local e = hufftable[v]
+    local e = t[v]
     bs:flushb(e%16)
     return flr(e/16)
   end
@@ -75,22 +75,22 @@ local function bs_init(data)
   return bs
 end
 
-local function hufftable_create(table,depths,nvalues)
+local function construct(table,depths,nvalues)
   local bl_count = {}
   local nbits = 1
-  for i=0,16 do
+  for i=1,17 do
     bl_count[i] = 0
   end
   for i=1,nvalues do
     local d = depths[i]
     nbits = max(nbits, d)
-    bl_count[d] += 1
+    bl_count[d+1] += 1
   end
   local code = 0
   local next_code = {}
-  bl_count[0] = 0
+  bl_count[1] = 0
   for i=1,nbits do
-    code = (code + bl_count[i-1]) * 2
+    code = (code + bl_count[i]) * 2
     next_code[i] = code
   end
   for i=1,nvalues do
@@ -162,7 +162,7 @@ methods[2] = function(bs)
   for i=1,19 do
     depths[order[i]] = i>hclen and 0 or bs:getb(3)
   end
-  local nlen = hufftable_create(lengthtable,depths,19)
+  local nlen = construct(lengthtable,depths,19)
   local i=1
   while i<=hlit+hdist do
     local v = bs:getv(lengthtable,nlen)
@@ -188,9 +188,9 @@ methods[2] = function(bs)
     end
   end
   for i=1,hlit do litdepths[i] = depths[i] end
-  local nlit = hufftable_create(littable,litdepths,hlit)
+  local nlit = construct(littable,litdepths,hlit)
   for i=1,hdist do distdepths[i] = depths[i+hlit] end
-  local ndist = hufftable_create(disttable,distdepths,hdist)
+  local ndist = construct(disttable,distdepths,hdist)
   inflate_block_loop(bs,nlit,ndist,littable,disttable)
 end
 
@@ -203,11 +203,11 @@ methods[1] = function(bs)
       add(depths,7+i%3)
     end
   end
-  local nlit = hufftable_create(littable,depths,288)
+  local nlit = construct(littable,depths,288)
   for i=1,32 do
     depths[i] = 5
   end
-  local ndist = hufftable_create(disttable,depths,32)
+  local ndist = construct(disttable,depths,32)
   inflate_block_loop(bs,nlit,ndist,littable,disttable)
 end
 
