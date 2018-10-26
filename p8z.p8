@@ -149,14 +149,13 @@ local function inflate_block_loop(bs,nlit,ndist)
   until lit == 256
 end
 
-local order = { 17, 18, 19, 1, 9, 8, 10, 7, 11, 6, 12, 5, 13, 4, 14, 3, 15, 2, 16 }
-local depths = {}
-local lengthtable = {}
-local litdepths = {}
-local distdepths = {}
-
 -- inflate dynamic block
 methods[2] = function(bs)
+  local litdepths = {}
+  local distdepths = {}
+  local depths = {}
+  local lengthtable = {}
+  local order = { 17, 18, 19, 1, 9, 8, 10, 7, 11, 6, 12, 5, 13, 4, 14, 3, 15, 2, 16 }
   local hlit = 257 + bs:getb(5)
   local hdist = 1 + bs:getb(5)
   local hclen = 4 + bs:getb(4)
@@ -195,17 +194,13 @@ methods[2] = function(bs)
   inflate_block_loop(bs,nlit,ndist,littable,disttable)
 end
 
-local stcnt = { 144, 112, 24, 8 }
-local stdpt = { 8, 9, 7, 8 }
-
 -- inflate static block
 methods[1] = function(bs)
-  local k = 1
+  local depths = {}
+  local stcnt = { 18, 14, 3, 1 }
   for i=1,4 do
-    local d = stdpt[i]
-    for j=1,stcnt[i] do
-      depths[k] = d
-      k += 1
+    for j=1,8*stcnt[i] do
+      add(depths,7+i%3)
     end
   end
   local nlit = hufftable_create(littable,depths,288)
