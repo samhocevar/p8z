@@ -37,40 +37,40 @@ local function bs_init(data)
       self.pos += 1
       self.n += 8
     end
-    local h = reverse[band(shl(self.b,16),0xff)]
-    local l = reverse[band(shl(self.b,8),0xff)]
+    local h = reverse[band(shl(self.b,16),255)]
+    local l = reverse[band(shl(self.b,8),255)]
     local v = band(shr(shl(h,8)+l,16-n),shl(1,n)-1)
     local e = t[v]
     bs:flushb(e%16)
     return flr(e/16)
   end
   function bs:write(n)
-    local d = band(self.outpos, 0.75)
+    local d = band(self.outpos,.75)
     local off = flr(self.outpos)
     if d==0 then
       n=shr(n,16)
     else
-      if d==0.25 then
+      if d==.25 then
         n=shr(n,8)
-      elseif d==0.75 then
+      elseif d==.75 then
         n=shl(n,8)
       end
       n+=self.out[off]
     end
     self.out[off] = n
-    self.outpos += 0.25
+    self.outpos += .25
   end
   function bs:readback(off)
-    local d = band(self.outpos + off * 0.25, 0.75)
-    local n = self.out[flr(self.outpos + off * 0.25)]
+    local d = band(self.outpos + off * .25,.75)
+    local n = self.out[flr(self.outpos + off * .25)]
     if d==0 then
       n=shl(n,16)
-    elseif d==0.25 then
+    elseif d==.25 then
       n=shl(n,8)
-    elseif d==0.75 then
+    elseif d==.75 then
       n=shr(n,8)
     end
-    return band(n,0xff)
+    return band(n,255)
   end
   return bs
 end
@@ -83,7 +83,7 @@ local function construct(table,depths,nvalues)
   end
   for i=1,nvalues do
     local d = depths[i]
-    nbits = max(nbits, d)
+    nbits = max(nbits,d)
     bl_count[d+1] += 1
   end
   local code = 0
@@ -155,7 +155,7 @@ methods[2] = function(bs)
   local distdepths = {}
   local depths = {}
   local lengthtable = {}
-  local order = { 17, 18, 19, 1, 9, 8, 10, 7, 11, 6, 12, 5, 13, 4, 14, 3, 15, 2, 16 }
+  local order = {17,18,19,1,9,8,10,7,11,6,12,5,13,4,14,3,15,2,16}
   local hlit = 257 + bs:getb(5)
   local hdist = 1 + bs:getb(5)
   local hclen = 4 + bs:getb(4)
