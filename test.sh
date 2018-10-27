@@ -21,7 +21,7 @@ test_string() {
   cat p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
   # Compress and skip first two bytes (zlib header)
-  printf %s "$STR" | zlib-flate -compress | od -v -An -t x1 -w1 \
+  printf %s "$STR" | ./p8z | od -v -An -t x1 -w1 \
       | tail -n +3 | while read i; do echo "0x$i,"; done | tr -d '\n' >> "$TMPFILE"
   echo '} t=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1))) for i=0,#t do printh(tostr(t[i], true)) end' >> "$TMPFILE"
   z8tool --headless "$TMPFILE"
@@ -32,7 +32,7 @@ test_file() {
   cat p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
   # Compress and skip first two bytes (zlib header)
-  cat $* | zlib-flate -compress | od -v -An -t x1 -w1 \
+  cat $* | ./p8z | od -v -An -t x1 -w1 \
       | tail -n +3 | while read i; do echo "0x$i,"; done | tr -d '\n' >> "$TMPFILE"
   echo '} t=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1)))' >> "$TMPFILE"
   z8tool --headless "$TMPFILE"
