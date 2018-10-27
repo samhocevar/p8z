@@ -12,44 +12,42 @@ function inflate(data)
     reverse[i] = k
   end
 
-  local pos = 1     -- char buffer index
+  local pos = 1     -- input char buffer index
   local sb = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
   local sn = 0      -- number of bits in buffer
   local out = {}    -- output array
   local outpos = 0  -- output position
 
   -- get rid of n first bits
-  local function flushb(n)
+  local function flb(n)
     sn -= n
     sb = shr(sb,n)
   end
 
-  -- get a number of n bits from stream
-  local function getb(n)
+  local function pkb(n)
     while sn < n do
       sb += shr(data[pos],16-sn)
       pos += 1
       sn += 8
     end
-    local ret = band(shl(sb,16),2^n-1)
-    flushb(n)
-    return ret
+    return band(shl(sb,16),2^n-1)
+  end
+
+  -- get a number of n bits from stream
+  local function getb(n)
+    return pkb(n),flb(n)
   end
 
   -- get next variable-size of maximum size=n element from stream, according to huffman table
   local function getv(t,n)
     -- require at least n bits, even if p<n bytes may be actually consumed
-    while sn < n do
-      sb += shr(data[pos],16-sn)
-      pos += 1
-      sn += 8
-    end
+    pkb(n)
     -- reverse using a 16-bit word
     -- fixme: maybe we could get rid of reversing in the encoder?
     local h = reverse[band(shl(sb,16),255)]
     local l = reverse[band(shl(sb,8),255)]
     local v = band(shr(256*h+l,16-n),2^n-1)
-    flushb(t[v]%16)
+    flb(t[v]%16)
     return flr(t[v]/16)
   end
 
@@ -204,7 +202,7 @@ function inflate(data)
   methods[0] = function()
     -- align input buffer to byte (as per spec)
     -- fixme: we could omit this!
-    flushb(sn%8)
+    flb(sn%8)
     local len = getb(16)
     if sn > 0 then                                                   -- debug
       error("unexpected.. should be zero remaining bits in buffer.") -- debug
@@ -228,7 +226,7 @@ function inflate(data)
     local last = getb(1)
     methods[getb(2)]()
   until last == 1
-  flushb(sn%8)  -- debug (no need to flush!)
+  flb(sn%8)  -- debug (no need to flush!)
 
   return out
 end
