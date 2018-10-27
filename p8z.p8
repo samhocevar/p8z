@@ -65,13 +65,13 @@ function inflate(data)
   end
 
   -- build a huffman table
-  local function construct(table,depths,nvalues)
+  local function construct(table,depths)
     local bl_count = {}
     local nbits = 1
     for i=1,17 do
       bl_count[i] = 0
     end
-    for i=1,nvalues do
+    for i=1,#depths do
       local d = depths[i]
       nbits = max(nbits,d)
       bl_count[d+1] += 1
@@ -83,7 +83,7 @@ function inflate(data)
       code = (code + bl_count[i]) * 2
       next_code[i] = code
     end
-    for i=1,nvalues do
+    for i=1,#depths do
       local len = depths[i] or 0
       if len > 0 then
         local code0 = shl(next_code[len],nbits-len)
@@ -152,7 +152,7 @@ function inflate(data)
       -- the formula below differs from the original deflate
       depths[(i+15)%19+1] = i>hclen and 0 or getb(3)
     end
-    local nlen = construct(lengthtable,depths,19)
+    local nlen = construct(lengthtable,depths)
     local i=1
     while i<=hlit+hdist do
       local v = getv(lengthtable,nlen)
@@ -178,20 +178,20 @@ function inflate(data)
       end
     end
     for i=1,hlit do litdepths[i] = depths[i] end
-    local nlit = construct(littable,litdepths,hlit)
+    local nlit = construct(littable,litdepths)
     for i=1,hdist do distdepths[i] = depths[i+hlit] end
-    local ndist = construct(disttable,distdepths,hdist)
+    local ndist = construct(disttable,distdepths)
     inflate_block_loop(nlit,ndist,littable,disttable)
   end
 
   -- inflate static block
   methods[1] = function()
     local depths = {}
+    for i=1,32 do depths[i]=5 end
+    local ndist = construct(disttable,depths)
     for i=1,288 do depths[i]=8 end
     for i=145,280 do depths[i]+=sgn(256-i) end
-    local nlit = construct(littable,depths,288)
-    for i=1,32 do depths[i]=5 end
-    local ndist = construct(disttable,depths,32)
+    local nlit = construct(littable,depths)
     inflate_block_loop(nlit,ndist,littable,disttable)
   end
 
