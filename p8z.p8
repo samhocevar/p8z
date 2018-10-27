@@ -52,11 +52,9 @@ function inflate(data)
   end
 
   local function write(n)
-    local d = outpos%1
+    local d = (outpos)%1  -- the parentheses here help compressing the code!
     local p = flr(outpos)
-    n*=256^(4*d-2)
-    n+=out[p]or 0
-    out[p]=n
+    out[p]=n*256^(4*d-2)+(out[p]or 0)
     outpos+=1/4
   end
 
@@ -113,26 +111,25 @@ function inflate(data)
       if lit < 256 then
         write(lit)
       elseif lit > 256 then
+        lit -= 257
         local nbits = 0
         local size = 3
         local dist = 1
-        if lit < 265 then
-          size += lit - 257
-        elseif lit < 285 then
-          nbits = flr(shr(lit-261,2))
-          size += shl(band(lit-261,3)+4,nbits)
+        if lit < 8 then
+          size += lit
+        elseif lit < 28 then
+          nbits = flr(lit/4)-1
+          size += shl(lit%4+4,nbits)
+          size += getb(nbits)
         else
           size = 258
-        end
-        if nbits > 0 then
-          size += getb(nbits)
         end
         local v = getv(disttable,ndist)
         if v < 4 then
           dist += v
         else
           nbits = flr(v/2-1)
-          dist += shl(band(v,1)+2,nbits)
+          dist += shl(v%2+2,nbits)
           dist += getb(nbits)
         end
         for n = 1,size do
