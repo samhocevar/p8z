@@ -148,28 +148,26 @@ function inflate(data)
       depths[(i+15)%19+1] = i>hclen and 0 or getb(3)
     end
     local lengthtable = construct(depths)
-    local i=1
-    while i<=hlit+hdist do
+    depths = {}
+    while #depths<hlit+hdist do
       local v = getv(lengthtable)
+      if v >= 19 then                                                        -- debug
+        error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
+      end                                                                    -- debug
       if v < 16 then
-        depths[i] = v
-        i += 1
-      elseif v < 19 then
+        add(depths,v)
+      else
         local nbt = {2,3,7}
-        local nb = nbt[v-15]
         local c = 0
-        local n = 3 + getb(nb)
+        local n = 3 + getb(nbt[v-15])
         if v == 16 then
-          c = depths[i-1]
+          c = depths[#depths]
         elseif v == 18 then
           n += 8
         end
         for j=1,n do
-          depths[i] = c
-          i += 1
+          add(depths,c)
         end
-      else                                                                   -- debug
-        error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end
     end
     local litdepths = {}
