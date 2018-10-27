@@ -149,45 +149,41 @@ function inflate(data)
     end
     local lengthtable = construct(depths)
     depths = {}
-    while #depths<hlit+hdist do
+    local depths2 = {}
+    local c = 0
+    while #depths+#depths2<hlit+hdist do
       local v = getv(lengthtable)
       if v >= 19 then                                                        -- debug
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end                                                                    -- debug
       if v < 16 then
-        add(depths,v)
+        c = v
+        add(#depths<hlit and depths or depths2,c)
       else
         local nbt = {2,3,7}
-        local c = 0
         local n = 3 + getb(nbt[v-15])
-        if v == 16 then
-          c = depths[#depths]
-        elseif v == 18 then
+        if v != 16 then
+          c = 0
+        end
+        if v == 18 then
           n += 8
         end
         for j=1,n do
-          add(depths,c)
+          add(#depths<hlit and depths or depths2,c)
         end
       end
     end
-    local litdepths = {}
-    local distdepths = {}
-    for i=1,hlit do litdepths[i] = depths[i] end
-    local littable = construct(litdepths)
-    for i=1,hdist do distdepths[i] = depths[i+hlit] end
-    local disttable = construct(distdepths)
-    inflate_block_loop(littable,disttable)
+    inflate_block_loop(construct(depths),construct(depths2))
   end
 
   -- inflate static block
   methods[1] = function()
     local depths = {}
-    for i=1,32 do depths[i]=5 end
-    local disttable = construct(depths)
     for i=1,288 do depths[i]=8 end
     for i=145,280 do depths[i]+=sgn(256-i) end
-    local littable = construct(depths)
-    inflate_block_loop(littable,disttable)
+    local depths2 = {}
+    for i=1,32 do depths2[i]=5 end
+    inflate_block_loop(construct(depths),construct(depths2))
   end
 
   -- inflate uncompressed byte array
