@@ -65,16 +65,16 @@ function inflate(data)
   end
 
   -- build a huffman table
-  local function construct(depths)
+  local function mkhuf(d)
     local bl_count = {}
     local t = {nbits=1}
     for i=1,17 do
       bl_count[i] = 0
     end
-    for i=1,#depths do
-      local d = depths[i]
-      t.nbits = max(t.nbits,d)
-      bl_count[d+1] += 1
+    for i=1,#d do
+      local n = d[i]
+      t.nbits = max(t.nbits,n)
+      bl_count[n+1] += 1
     end
     local code = 0
     local next_code = {}
@@ -83,8 +83,8 @@ function inflate(data)
       code = (code + bl_count[i]) * 2
       next_code[i] = code
     end
-    for i=1,#depths do
-      local len = depths[i] or 0
+    for i=1,#d do
+      local len = d[i] or 0
       if len > 0 then
         local code0 = shl(next_code[len],t.nbits-len)
         next_code[len] += 1
@@ -100,10 +100,10 @@ function inflate(data)
     return t
   end
 
-  local function inflate_block_loop(littable,disttable)
+  local function do_block(t1,t2)
     local lit
     repeat
-      lit = getv(littable)
+      lit = getv(t1)
       if lit < 256 then
         write(lit)
       elseif lit > 256 then
@@ -120,7 +120,7 @@ function inflate(data)
         else
           size = 258
         end
-        local v = getv(disttable)
+        local v = getv(t2)
         if v < 4 then
           dist += v
         else
@@ -139,26 +139,26 @@ function inflate(data)
 
   -- inflate dynamic block
   methods[2] = function()
-    local depths = {}
+    local d = {}
     local hlit = 257 + getb(5)
     local hdist = 1 + getb(5)
     local hclen = 4 + getb(4)
     for i=1,19 do
       -- the formula below differs from the original deflate
-      depths[(i+15)%19+1] = i>hclen and 0 or getb(3)
+      d[(i+15)%19+1] = i>hclen and 0 or getb(3)
     end
-    local lengthtable = construct(depths)
-    depths = {}
-    local depths2 = {}
+    local t = mkhuf(d)
+    d = {}
+    local d2 = {}
     local c = 0
-    while #depths+#depths2<hlit+hdist do
-      local v = getv(lengthtable)
+    while #d+#d2<hlit+hdist do
+      local v = getv(t)
       if v >= 19 then                                                        -- debug
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end                                                                    -- debug
       if v < 16 then
         c = v
-        add(#depths<hlit and depths or depths2,c)
+        add(#d<hlit and d or d2,c)
       else
         local nbt = {2,3,7}
         local n = 3 + getb(nbt[v-15])
@@ -169,21 +169,21 @@ function inflate(data)
           n += 8
         end
         for j=1,n do
-          add(#depths<hlit and depths or depths2,c)
+          add(#d<hlit and d or d2,c)
         end
       end
     end
-    inflate_block_loop(construct(depths),construct(depths2))
+    do_block(mkhuf(d),mkhuf(d2))
   end
 
   -- inflate static block
   methods[1] = function()
-    local depths = {}
-    for i=1,288 do depths[i]=8 end
-    for i=145,280 do depths[i]+=sgn(256-i) end
-    local depths2 = {}
-    for i=1,32 do depths2[i]=5 end
-    inflate_block_loop(construct(depths),construct(depths2))
+    local d = {}
+    for i=1,288 do d[i]=8 end
+    for i=145,280 do d[i]+=sgn(256-i) end
+    local d2 = {}
+    for i=1,32 do d2[i]=5 end
+    do_block(mkhuf(d),mkhuf(d2))
   end
 
   -- inflate uncompressed byte array
