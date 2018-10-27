@@ -11,25 +11,26 @@ extern z_const char * const z_errmsg[] = {};
 
 int main()
 {
-    std::vector<uint8_t> data;
+    std::vector<uint8_t> input;
     for (uint8_t ch : std::vector<char>{ std::istreambuf_iterator<char>(std::cin),
                                          std::istreambuf_iterator<char>() } )
-        data.push_back(ch);
+        input.push_back(ch);
 
-    std::vector<uint8_t> dest(data.size() * 2);
+    // Prepare a vector twice as big... we don't really care.
+    std::vector<uint8_t> output(input.size() * 2);
 
     z_stream zs = {};
     zs.zalloc = [](void *, unsigned int n, unsigned int m) -> void * { return new char[n * m]; };
     zs.zfree = [](void *, void *p) -> void { delete[] (char *)p; };
-    zs.next_in = (Bytef *)data.data();
-    zs.next_out = (Bytef *)dest.data();
-    zs.avail_in = (uInt)data.size();
-    zs.avail_out = (uInt)dest.size();
+    zs.next_in = input.data();
+    zs.next_out = output.data();
+    zs.avail_in = (uInt)input.size();
+    zs.avail_out = (uInt)output.size();
     
     deflateInit(&zs, Z_BEST_COMPRESSION);
     deflate(&zs, Z_FINISH);
     deflateEnd(&zs);
 
-    fwrite(dest.data(), 1, zs.total_out, stdout);
+    fwrite(output.data() + 2, 1, zs.total_out - 6, stdout);
 }
 
