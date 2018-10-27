@@ -69,7 +69,11 @@ local const int extra_blbits[BL_CODES]/* extra bits for each bit length code */
    = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7};
 
 local const uch bl_order[BL_CODES]
+#if P8Z
+   = {16,17,18,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+#else
    = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
+#endif
 /* The lengths of the bit length codes are sent in order of decreasing
  * probability, to avoid transmitting the lengths for unused bit length codes.
  */

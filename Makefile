@@ -1,6 +1,6 @@
 
 
-CPPFLAGS = -I./zlib -DZ_SOLO -DNO_GZIP -DHAVE_MEMCPY -Dlocal= -Os -g -ggdb -Wall -Wextra
+CPPFLAGS = -I./zlib -DP8Z -DZ_SOLO -DNO_GZIP -DHAVE_MEMCPY -Dlocal= -Os -g -ggdb -Wall -Wextra
 
 all: p8z
 

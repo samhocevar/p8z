@@ -142,12 +142,12 @@ methods[2] = function(bs)
   local distdepths = {}
   local depths = {}
   local lengthtable = {}
-  local order = {17,18,19,1,9,8,10,7,11,6,12,5,13,4,14,3,15,2,16}
   local hlit = 257 + bs:getb(5)
   local hdist = 1 + bs:getb(5)
   local hclen = 4 + bs:getb(4)
   for i=1,19 do
-    depths[order[i]] = i>hclen and 0 or bs:getb(3)
+    -- the formula below differs from the original deflate
+    depths[(i+15)%19+1] = i>hclen and 0 or bs:getb(3)
   end
   local nlen = construct(lengthtable,depths,19)
   local i=1
