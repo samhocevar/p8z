@@ -74,17 +74,16 @@ function inflate(data)
     for i=1,#d do
       local n = d[i]
       t.nbits = max(t.nbits,n)
-      bl_count[n+1] += 1
+      bl_count[n+1] += 2
     end
     local code = 0
     local next_code = {}
-    bl_count[1] = 0
     for i=1,t.nbits do
-      code = (code + bl_count[i]) * 2
       next_code[i] = code
+      code += code + bl_count[i+1]
     end
     for i=1,#d do
-      local len = d[i] or 0
+      local len = d[i]
       if len > 0 then
         local code0 = shl(next_code[len],t.nbits-len)
         next_code[len] += 1
