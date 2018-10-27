@@ -38,15 +38,15 @@ function inflate(data)
     return pkb(n),flb(n)
   end
 
-  -- get next variable-size of maximum size=n element from stream, according to huffman table
-  local function getv(t,n)
-    -- require at least n bits, even if p<n bytes may be actually consumed
-    pkb(n)
+  -- get next variable value from stream, according to huffman table
+  local function getv(t)
+    -- require at least n bits, even if only p<n bytes may be actually consumed
+    pkb(t.nbits)
     -- reverse using a 16-bit word
     -- fixme: maybe we could get rid of reversing in the encoder?
     local h = reverse[band(shl(sb,16),255)]
     local l = reverse[band(shl(sb,8),255)]
-    local v = band(shr(256*h+l,16-n),2^n-1)
+    local v = band(shr(256*h+l,16-t.nbits),2^t.nbits-1)
     flb(t[v]%16)
     return flr(t[v]/16)
   end
@@ -65,49 +65,45 @@ function inflate(data)
   end
 
   -- build a huffman table
-  local function construct(table,depths)
+  local function construct(depths)
     local bl_count = {}
-    local nbits = 1
+    local t = {nbits=1}
     for i=1,17 do
       bl_count[i] = 0
     end
     for i=1,#depths do
       local d = depths[i]
-      nbits = max(nbits,d)
+      t.nbits = max(t.nbits,d)
       bl_count[d+1] += 1
     end
     local code = 0
     local next_code = {}
     bl_count[1] = 0
-    for i=1,nbits do
+    for i=1,t.nbits do
       code = (code + bl_count[i]) * 2
       next_code[i] = code
     end
     for i=1,#depths do
       local len = depths[i] or 0
       if len > 0 then
-        local code0 = shl(next_code[len],nbits-len)
+        local code0 = shl(next_code[len],t.nbits-len)
         next_code[len] += 1
-        local code1 = shl(next_code[len],nbits-len)
-        if code1 > shl(1,nbits) then -- debug
-          error("code error")        -- debug
-        end                          -- debug
+        local code1 = shl(next_code[len],t.nbits-len)
+        if code1 > shl(1,t.nbits) then -- debug
+          error("code error")          -- debug
+        end                            -- debug
         for j=code0,code1-1 do
-          table[j] = (i-1)*16 + len
+          t[j] = (i-1)*16 + len
         end
       end
     end
-    return nbits
+    return t
   end
 
-  local methods = {}
-  local littable = {}
-  local disttable = {}
-
-  local function inflate_block_loop(nlit,ndist)
+  local function inflate_block_loop(littable,disttable)
     local lit
     repeat
-      lit = getv(littable,nlit)
+      lit = getv(littable)
       if lit < 256 then
         write(lit)
       elseif lit > 256 then
@@ -124,11 +120,11 @@ function inflate(data)
         else
           size = 258
         end
-        local v = getv(disttable,ndist)
+        local v = getv(disttable)
         if v < 4 then
           dist += v
         else
-          nbits = flr(v/2-1)
+          nbits = flr(v/2)-1
           dist += shl(v%2+2,nbits)
           dist += getb(nbits)
         end
@@ -139,12 +135,11 @@ function inflate(data)
     until lit == 256
   end
 
+  local methods = {}
+
   -- inflate dynamic block
   methods[2] = function()
-    local litdepths = {}
-    local distdepths = {}
     local depths = {}
-    local lengthtable = {}
     local hlit = 257 + getb(5)
     local hdist = 1 + getb(5)
     local hclen = 4 + getb(4)
@@ -152,10 +147,10 @@ function inflate(data)
       -- the formula below differs from the original deflate
       depths[(i+15)%19+1] = i>hclen and 0 or getb(3)
     end
-    local nlen = construct(lengthtable,depths)
+    local lengthtable = construct(depths)
     local i=1
     while i<=hlit+hdist do
-      local v = getv(lengthtable,nlen)
+      local v = getv(lengthtable)
       if v < 16 then
         depths[i] = v
         i += 1
@@ -177,22 +172,24 @@ function inflate(data)
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end
     end
+    local litdepths = {}
+    local distdepths = {}
     for i=1,hlit do litdepths[i] = depths[i] end
-    local nlit = construct(littable,litdepths)
+    local littable = construct(litdepths)
     for i=1,hdist do distdepths[i] = depths[i+hlit] end
-    local ndist = construct(disttable,distdepths)
-    inflate_block_loop(nlit,ndist,littable,disttable)
+    local disttable = construct(distdepths)
+    inflate_block_loop(littable,disttable)
   end
 
   -- inflate static block
   methods[1] = function()
     local depths = {}
     for i=1,32 do depths[i]=5 end
-    local ndist = construct(disttable,depths)
+    local disttable = construct(depths)
     for i=1,288 do depths[i]=8 end
     for i=145,280 do depths[i]+=sgn(256-i) end
-    local nlit = construct(littable,depths)
-    inflate_block_loop(nlit,ndist,littable,disttable)
+    local littable = construct(depths)
+    inflate_block_loop(littable,disttable)
   end
 
   -- inflate uncompressed byte array
