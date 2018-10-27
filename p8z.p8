@@ -114,7 +114,7 @@ function inflate(data)
         if lit < 8 then
           size += lit
         elseif lit < 28 then
-          nbits = flr(lit/4)-1
+          nbits = flr(lit/4-1)
           size += shl(lit%4+4,nbits)
           size += getb(nbits)
         else
@@ -124,7 +124,7 @@ function inflate(data)
         if v < 4 then
           dist += v
         else
-          nbits = flr(v/2)-1
+          nbits = flr(v/2-1)
           dist += shl(v%2+2,nbits)
           dist += getb(nbits)
         end

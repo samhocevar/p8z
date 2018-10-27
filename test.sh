@@ -3,10 +3,23 @@
 PATH="$PATH:$HOME/zepto8"
 TMPFILE=.p8z-temp.p8
 
+minify() {
+  head -n 3 "$1"
+  cat "$1" | tail -n +4 \
+    | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
+    | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
+    | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
+    | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
+    | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
+    | tr ' ' '\n'
+}
+
 # Inspect p8z.p8 for stats
 echo "# Inspecting: p8z.p8"
-cat p8z.p8 | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . > "$TMPFILE"
+minify p8z.p8 > "$TMPFILE"
 z8tool --inspect "$TMPFILE"
+echo "printh('Cart code: valid')" >> "$TMPFILE"
+z8tool --headless "$TMPFILE"
 echo ""
 
 # Check that the code works
@@ -18,7 +31,7 @@ test_string() {
   printf %s "$STR" | od -v -An -x --endian=little | xargs -n2 | awk '{ print "0x"$2"."$1 }'
 
   echo "### PICO-8"
-  cat p8z.p8 > "$TMPFILE"
+  minify p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
   # Compress and skip first two bytes (zlib header)
   printf %s "$STR" | ./p8z | od -v -An -t x1 -w1 \
@@ -29,7 +42,7 @@ test_string() {
 
 test_file() {
   echo "# Compressing files: $*"
-  cat p8z.p8 > "$TMPFILE"
+  minify p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
   # Compress and skip first two bytes (zlib header)
   cat $* | ./p8z | od -v -An -t x1 -w1 \
