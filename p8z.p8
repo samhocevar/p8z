@@ -35,13 +35,13 @@ function inflate(s)
   local function pkb(n)
     while sn < n do
       local x = 2^-16
-      local m59 = {0,9,579}
+      local t = {9,579}
       if state == 0 then
         local p = 0 sb2 = 0
         for i=1,8 do
           local c = lut[sub(s,i,i)] or 0
           p += x%1*c
-          sb2 += c*(lshr(x,16) + m59[max(1,i-5)])
+          sb2 += (lshr(x,16) + (t[i-6] or 0))*c
           x *= 59
         end
         s = sub(s,9)
