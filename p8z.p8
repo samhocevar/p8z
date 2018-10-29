@@ -34,13 +34,15 @@ function inflate(s)
   -- peek n bits from the stream
   local function pkb(n)
     while sn < n do
-      local m59 = {0x.0001,0x.003b,0x.0d99,0x3.2243,0xb8.e571,0x2a9c.e10b,0x5227.dd89,0x6f30.0e93,0,9.5,579}
+      local x = 2^-16
+      local m59 = {0,9,579}
       if state == 0 then
         local p = 0 sb2 = 0
         for i=1,8 do
           local c = lut[sub(s,i,i)] or 0
-          p += m59[i]%1*c
-          sb2 += c*(shr(m59[i],16) + m59[max(9,i+3)])
+          p += x%1*c
+          sb2 += c*(lshr(x,16) + m59[max(1,i-5)])
+          x *= 59
         end
         s = sub(s,9)
         sb2 += shr(p,16)
