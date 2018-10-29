@@ -178,18 +178,17 @@ function inflate(data)
     -- align input buffer to byte (as per spec)
     -- fixme: we could omit this!
     flb(sn%8)
-    local len = getb(16)
     if sn > 0 then                                                   -- debug
       error("unexpected.. should be zero remaining bits in buffer.") -- debug
     end                                                              -- debug
+    local len = getb(16)
     local nlen = getb(16)
     if bxor(len,nlen) != 0xffff then    -- debug
       error("len and nlen don't match") -- debug
     end                                 -- debug
-    for i=0,len-1 do
-      write(data[pos+i])
+    for i=1,len do
+      write(getb(8))
     end
-    pos += len
   end
 
   -- block type 3 does not exist
