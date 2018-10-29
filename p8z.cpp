@@ -13,7 +13,7 @@ int main()
 {
     std::vector<uint8_t> input;
     for (uint8_t ch : std::vector<char>{ std::istreambuf_iterator<char>(std::cin),
-                                         std::istreambuf_iterator<char>() } )
+                                         std::istreambuf_iterator<char>() })
         input.push_back(ch);
 
     // Prepare a vector twice as big... we don't really care.
@@ -29,8 +29,10 @@ int main()
     
     deflateInit(&zs, Z_BEST_COMPRESSION);
     deflate(&zs, Z_FINISH);
+    // Strip first 2 bytes (deflate header) and last 4 bytes (checksum)
+    output = std::vector<uint8_t>(output.begin() + 2, output.begin() + zs.total_out - 4);
     deflateEnd(&zs);
 
-    fwrite(output.data() + 2, 1, zs.total_out - 6, stdout);
+    fwrite(output.data(), 1, output.size(), stdout);
 }
 

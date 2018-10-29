@@ -41,12 +41,12 @@ function inflate(data)
   -- get next variable value from stream, according to huffman table
   local function getv(t)
     -- require at least n bits, even if only p<n bytes may be actually consumed
-    pkb(t.nbits)
+    pkb(t.n)
     -- reverse using a 16-bit word
     -- fixme: maybe we could get rid of reversing in the encoder?
     local h = reverse[band(shl(sb,16),255)]
     local l = reverse[band(shl(sb,8),255)]
-    local v = band(shr(256*h+l,16-t.nbits),2^t.nbits-1)
+    local v = band(shr(256*h+l,16-t.n),2^t.n-1)
     flb(t[v]%16)
     return flr(t[v]/16)
   end
@@ -66,31 +66,31 @@ function inflate(data)
 
   -- build a huffman table
   local function mkhuf(d)
-    local bl_count = {}
-    local t = {nbits=1}
+    local bc = {}
+    local t = {n=1}
     for i=1,17 do
-      bl_count[i] = 0
+      bc[i] = 0
     end
     for i=1,#d do
       local n = d[i]
-      t.nbits = max(t.nbits,n)
-      bl_count[n+1] += 2
+      t.n = max(t.n,n)
+      bc[n+1] += 2
     end
     local code = 0
     local next_code = {}
-    for i=1,t.nbits do
+    for i=1,t.n do
       next_code[i] = code
-      code += code + bl_count[i+1]
+      code += code + bc[i+1]
     end
     for i=1,#d do
       local len = d[i]
       if len > 0 then
-        local code0 = shl(next_code[len],t.nbits-len)
+        local code0 = shl(next_code[len],t.n-len)
         next_code[len] += 1
-        local code1 = shl(next_code[len],t.nbits-len)
-        if code1 > shl(1,t.nbits) then -- debug
-          error("code error")          -- debug
-        end                            -- debug
+        local code1 = shl(next_code[len],t.n-len)
+        if code1 > shl(1,t.n) then -- debug
+          error("code error")      -- debug
+        end                        -- debug
         for j=code0,code1-1 do
           t[j] = (i-1)*16 + len
         end
@@ -107,15 +107,15 @@ function inflate(data)
         write(lit)
       elseif lit > 256 then
         lit -= 257
-        local nbits = 0
+        local n = 0
         local size = 3
         local dist = 1
         if lit < 8 then
           size += lit
         elseif lit < 28 then
-          nbits = flr(lit/4-1)
-          size += shl(lit%4+4,nbits)
-          size += getb(nbits)
+          n = flr(lit/4-1)
+          size += shl(lit%4+4,n)
+          size += getb(n)
         else
           size = 258
         end
@@ -123,9 +123,9 @@ function inflate(data)
         if v < 4 then
           dist += v
         else
-          nbits = flr(v/2-1)
-          dist += shl(v%2+2,nbits)
-          dist += getb(nbits)
+          n = flr(v/2-1)
+          dist += shl(v%2+2,n)
+          dist += getb(n)
         end
         for n = 1,size do
           write(readback(-dist))
@@ -155,22 +155,10 @@ function inflate(data)
       if v >= 19 then                                                        -- debug
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end                                                                    -- debug
-      if v < 16 then
-        c = v
-        add(#d<hlit and d or d2,c)
-      else
-        local nbt = {2,3,7}
-        local n = 3 + getb(nbt[v-15])
-        if v != 16 then
-          c = 0
-        end
-        if v == 18 then
-          n += 8
-        end
-        for j=1,n do
-          add(#d<hlit and d or d2,c)
-        end
-      end
+      if v < 16 then c=v add(#d<hlit and d or d2,c) end
+      if v == 16 then for j=-2,getb(2) do add(#d<hlit and d or d2,c) end end
+      if v == 17 then c=0 for j=-2,getb(3) do add(#d<hlit and d or d2,c) end end
+      if v == 18 then c=0 for j=-2,getb(7)+8 do add(#d<hlit and d or d2,c) end end
     end
     do_block(mkhuf(d),mkhuf(d2))
   end
