@@ -35,24 +35,24 @@ function inflate(s)
   local function pkb(n)
     while sn < n do
       local x = 2^-16
-      local t = {9,579}
+      local t = {9,579} -- these are the higher bits (>=32) of 59^7 and 59^8
       if state == 0 then
         local p = 0 sb2 = 0
         for i=1,8 do
           local c = lut[sub(s,i,i)] or 0
-          p += x%1*c
-          sb2 += (lshr(x,16) + (t[i-6] or 0))*c
+          sb2 += x%1*c
+          p += (lshr(x,16) + (t[i-6] or 0))*c
           x *= 59
         end
         s = sub(s,9)
-        sb2 += shr(p,16)
-        sb += p%1*2^sn
+        sb += sb2%1*2^sn
         sn += 16
-        state = 1
+        state += 1
+        sb2 = p + shr(sb2,16)
       elseif state == 1 then
         sb += sb2%1*2^sn
         sn += 16
-        state = 2
+        state += 1
       else
         sb += shr(sb2,16)*2^sn
         sn += 15
