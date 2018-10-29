@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
-function inflate(data)
+function inflate(s)
   -- init reverse array
   local reverse = {}
   for i=0,255 do
@@ -16,7 +16,6 @@ function inflate(data)
   for i=1,58 do lut[sub(" 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_",i,i)]=i end
 
   -- init stream reader
-  local pos = 1     -- input char buffer index
   local state = 0   -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local sb = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
   local sb2 = 0     -- temp chunk buffer
@@ -39,11 +38,11 @@ function inflate(data)
       if state == 0 then
         local p = 0 sb2 = 0
         for i=1,8 do
-          local c = lut[sub(data,pos,pos)] or 0
+          local c = lut[sub(s,i,i)] or 0
           p += m59[i]%1*c
           sb2 += c*(shr(m59[i],16) + m59[max(9,i+3)])
-          pos += 1
         end
+        s = sub(s,9)
         sb2 += shr(p,16)
         sb += p%1*2^sn
         sn += 16
