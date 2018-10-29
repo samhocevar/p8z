@@ -3,18 +3,26 @@ version 16
 __lua__
 
 function inflate(data)
-  local reverse = {}
-
   -- init reverse array
+  local reverse = {}
   for i=0,255 do
     local k=0
     for j=0,7 do k+=band(i,2^j)*128/4^j end
     reverse[i] = k
   end
 
+  -- init char lookup method
+  local lut = {}
+  for i=1,58 do lut[sub(" 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_",i,i)]=i end
+
+  -- init stream reader
   local pos = 1     -- input char buffer index
+  local state = 0   -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local sb = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
+  local sb2 = 0     -- temp chunk buffer
   local sn = 0      -- number of bits in buffer
+
+  -- init stream writer
   local out = {}    -- output array
   local outpos = 0  -- output position
 
@@ -24,16 +32,36 @@ function inflate(data)
     sb = shr(sb,n)
   end
 
+  -- peek n bits from the stream
   local function pkb(n)
     while sn < n do
-      sb += shr(data[pos],16-sn)
-      pos += 1
-      sn += 8
+      local m59 = {0x.0001,0x.003b,0x.0d99,0x3.2243,0xb8.e571,0x2a9c.e10b,0x5227.dd89,0x6f30.0e93,0,9.5,579}
+      if state == 0 then
+        local p = 0 sb2 = 0
+        for i=1,8 do
+          local c = lut[sub(data,pos,pos)] or 0
+          p += m59[i]%1*c
+          sb2 += c*(shr(m59[i],16) + m59[max(9,i+3)])
+          pos += 1
+        end
+        sb2 += shr(p,16)
+        sb += p%1*2^sn
+        sn += 16
+        state = 1
+      elseif state == 1 then
+        sb += sb2%1*2^sn
+        sn += 16
+        state = 2
+      else
+        sb += shr(sb2,16)*2^sn
+        sn += 15
+        state = 0
+      end
     end
     return band(shl(sb,16),2^n-1)
   end
 
-  -- get a number of n bits from stream
+  -- get a number of n bits from stream and flush them
   local function getb(n)
     return pkb(n),flb(n)
   end

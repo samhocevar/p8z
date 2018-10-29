@@ -6,12 +6,14 @@ TMPFILE=.p8z-temp.p8
 minify() {
   head -n 3 "$1"
   cat "$1" | tail -n +4 \
+    | sed 's/" 0123/PROTECTME/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
     | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
-    | tr ' ' '\n'
+    | tr ' ' '\n' \
+    | sed 's/PROTECTME/" 0123/'
 }
 
 # Inspect p8z.p8 for stats
@@ -32,22 +34,18 @@ test_string() {
 
   echo "### PICO-8"
   minify p8z.p8 > "$TMPFILE"
-  echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
-  # Compress and skip first two bytes (zlib header)
-  printf %s "$STR" | ./p8z | od -v -An -t x1 -w1 \
-      | while read i; do echo "0x$i,"; done | tr -d '\n' >> "$TMPFILE"
-  echo '} t=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1))) for i=0,#t do printh(tostr(t[i], true)) end' >> "$TMPFILE"
+  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
+  printf %s "$STR" | ./p8z >> "$TMPFILE"
+  echo 't=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1))) for i=0,#t do printh(tostr(t[i], true)) end' >> "$TMPFILE"
   z8tool --headless "$TMPFILE"
 }
 
 test_file() {
   echo "# Compressing files: $*"
   minify p8z.p8 > "$TMPFILE"
-  echo 'function error(m) printh("Error: "..tostr(m)) end c={' >> "$TMPFILE"
-  # Compress and skip first two bytes (zlib header)
-  cat $* | ./p8z | od -v -An -t x1 -w1 \
-      | while read i; do echo "0x$i,"; done | tr -d '\n' >> "$TMPFILE"
-  echo '} t=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1)))' >> "$TMPFILE"
+  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
+  cat $* | ./p8z >> "$TMPFILE"
+  echo 't=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1)))' >> "$TMPFILE"
   z8tool --headless "$TMPFILE"
 }
 
