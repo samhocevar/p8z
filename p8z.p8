@@ -103,24 +103,24 @@ function inflate(s)
     for i=1,#d do
       local n = d[i]
       t.n = max(t.n,n)
-      bc[n+1] += 2
+      bc[n+1] += 2 -- premultiply by 2
     end
     local code = 0
-    local next_code = {}
+    local nc = {}
     for i=1,t.n do
-      next_code[i] = code
+      nc[i] = code
       code += code + bc[i+1]
     end
     for i=1,#d do
       local len = d[i]
       if len > 0 then
-        local code0 = shl(next_code[len],t.n-len)
-        next_code[len] += 1
-        local code1 = shl(next_code[len],t.n-len)
-        if code1 > shl(1,t.n) then -- debug
-          error("code error")      -- debug
-        end                        -- debug
-        for j=code0,code1-1 do
+        local c0 = shl(nc[len],t.n-len)
+        nc[len] += 1
+        local c1 = shl(nc[len],t.n-len)
+        if c1 > shl(1,t.n) then -- debug
+          error("code error")   -- debug
+        end                     -- debug
+        for j=c0,c1-1 do
           t[j] = (i-1)*16 + len
         end
       end
