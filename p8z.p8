@@ -13,7 +13,7 @@ function inflate(s)
 
   -- init char lookup method
   local lut = {}
-  for i=1,58 do lut[sub(" 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_",i,i)]=i end
+  for i=1,58 do lut[sub("0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_ ",i,i)]=i end
 
   -- init stream reader
   local state = 0   -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining

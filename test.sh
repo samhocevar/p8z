@@ -5,15 +5,16 @@ TMPFILE=.p8z-temp.p8
 
 minify() {
   head -n 3 "$1"
+#  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
-    | sed 's/" 0123/PROTECTME/' \
+    | sed 's/_ ",i,/PROTECTME/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
     | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
     | tr ' ' '\n' \
-    | sed 's/PROTECTME/" 0123/'
+    | sed 's/PROTECTME/_ ",i,/'
 }
 
 # Inspect p8z.p8 for stats
