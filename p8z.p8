@@ -75,8 +75,8 @@ function inflate(s)
     local h = reverse[band(shl(sb,16),255)]
     local l = reverse[band(shl(sb,8),255)]
     local v = band(shr(256*h+l,16-t.n),2^t.n-1)
-    flb(t[v]%16)
-    return flr(t[v]/16)
+    flb(t[v]%1*16)
+    return flr(t[v])
   end
 
   local function write(n)
@@ -122,7 +122,7 @@ function inflate(s)
           error("code error")   -- debug
         end                     -- debug
         for j=c0,c1-1 do
-          t[j] = (i-1)*16 + l
+          t[j] = i-1+l/16
         end
       end
     end
