@@ -32,7 +32,13 @@ function inflate(s)
 
   -- peek n bits from the stream
   local function pkb(n)
+    -- we need "while" instead of "do" because when reading
+    -- from memory we may need more than one 8-bit run.
     while sn < n do
+      -- not enough data in the stream:
+      -- unpack the next 8 characters of base59 data into
+      -- 47 bits of information that we insert into sb in
+      -- chunks of 16 or 15 bits.
       local x = 2^-16
       local t = {9,579} -- these are the higher bits (>=32) of 59^7 and 59^8
       if state == 0 then
@@ -79,6 +85,7 @@ function inflate(s)
     return flr(t[v])
   end
 
+  -- write 8 bits to the output, packed into a 32-bit number
   local function write(n)
     local d = (outpos)%1  -- the parentheses here help compressing the code!
     local p = flr(outpos)
@@ -86,6 +93,7 @@ function inflate(s)
     outpos+=1/4
   end
 
+  -- read back 8 bits from the output, at offset -p
   local function readback(p)
     local d = (outpos-p/4)%1
     local p = flr(outpos-p/4)
@@ -129,6 +137,7 @@ function inflate(s)
     return t
   end
 
+  -- decompress a block using the two huffman tables
   local function do_block(t1,t2)
     local lit
     repeat
