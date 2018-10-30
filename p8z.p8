@@ -94,33 +94,35 @@ function inflate(s)
 
   -- build a huffman table
   local function mkhuf(d)
-    local bc = {}
     local t = {n=1}
+    -- fill c with the bit length counts
+    local c = {}
     for i=1,17 do
-      bc[i] = 0
+      c[i] = 0
     end
     for i=1,#d do
       local n = d[i]
       t.n = max(t.n,n)
-      bc[n+1] += 2 -- premultiply by 2
+      c[n+1] += 2 -- premultiply by 2
     end
-    local code = 0
-    local nc = {}
-    for i=1,t.n do
-      nc[i] = code
-      code += code + bc[i+1]
+    -- replace the contents of c with the next code lengths
+    c[1]=0
+    for i=2,t.n do
+      c[i] += c[i-1]
+      c[i] += c[i-1]
     end
+    -- fill tree with the proper codes
     for i=1,#d do
-      local len = d[i]
-      if len > 0 then
-        local c0 = shl(nc[len],t.n-len)
-        nc[len] += 1
-        local c1 = shl(nc[len],t.n-len)
+      local l = d[i]
+      if l > 0 then
+        local c0 = shl(c[l],t.n-l)
+        c[l] += 1
+        local c1 = shl(c[l],t.n-l)
         if c1 > shl(1,t.n) then -- debug
           error("code error")   -- debug
         end                     -- debug
         for j=c0,c1-1 do
-          t[j] = (i-1)*16 + len
+          t[j] = (i-1)*16 + l
         end
       end
     end
