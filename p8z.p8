@@ -6,9 +6,8 @@ function inflate(s)
   -- init reverse array
   local reverse = {}
   for i=0,255 do
-    local k=0
-    for j=0,7 do k+=band(i,2^j)*128/4^j end
-    reverse[i] = k
+    reverse[i] = 0
+    for j=0,7 do reverse[i]+=band(i,2^j)*128/4^j end
   end
 
   -- init char lookup method
@@ -88,8 +87,8 @@ function inflate(s)
   end
 
   local function readback(p)
-    local d = (outpos+p/4)%1
-    local p = flr(outpos+p/4)
+    local d = (outpos-p/4)%1
+    local p = flr(outpos-p/4)
     return band(out[p]/256^(4*d-2),255)
   end
 
@@ -157,7 +156,7 @@ function inflate(s)
           dist += getb(n)
         end
         for n = 1,size do
-          write(readback(-dist))
+          write(readback(dist))
         end
       end
     until lit == 256
