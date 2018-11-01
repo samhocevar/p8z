@@ -3,6 +3,7 @@
 #include <iostream>
 #include <streambuf>
 #include <cstdint>
+#include <regex>
 
 extern "C" {
 #include "zlib.h"
@@ -42,12 +43,43 @@ std::string encode59(std::vector<uint8_t> const &v)
     if (ret[0] == '\n')
         ret = '\n' + ret;
 
+#if 1
+    // Workaround for a PICO-8 bug that freezes everything… 10 chars wasted!
+    // fixed in 1.1.12: https://www.lexaloffle.com/bbs/?tid=31673
+    // This is apparently because the parser knows to ignore stuff inside
+    // "[[" but not inside "[=[".
+    // The newlines are also required to avoid another bug:
+    // reported for 1.1.11g: https://www.lexaloffle.com/bbs/?tid=32148
+    ret = std::regex_replace(ret, std::regex("]]"), "XXX");
+
+    // Workaround for another bug that messes with the parser
+    // reported for 1.1.11g: https://www.lexaloffle.com/bbs/?tid=32155
+    ret = std::regex_replace(ret, std::regex("\\[\\[\\["), "YYY");
+    ret = std::regex_replace(ret, std::regex("\\[\\["), "ZZZ");
+
+    // Do the replacements described above
+    ret = std::regex_replace(ret, std::regex("XXX"), "]]\n..']]'..\n[[");
+    ret = std::regex_replace(ret, std::regex("YYY"), "[]]..'[['..[[");
+    ret = std::regex_replace(ret, std::regex("ZZZ"), "[]]..[[[");
+
+    // Of course if the above workaround is used, we need to take care
+    // of the "[[\n" sequences we may have created.
+    ret = std::regex_replace(ret, std::regex("\n\\[\\[\n"), "\n[[\n\n");
+
+    // And finally, we cannot end with "]".
+    if (ret.back() == ']')
+        return "[[" + ret + "]..']'";
+
+    return "[[" + ret + "]]";
+#else
     // If ]] appears in string we need to escape it with [=[...]=] and so on
     std::string prefix;
+
     while ((ret + "]").find("]" + prefix + "]") != std::string::npos)
         prefix += "=";
 
     return "[" + prefix + "[" + ret + "]" + prefix + "]";
+#endif
 }
 
 int main()
