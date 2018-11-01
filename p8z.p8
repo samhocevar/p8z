@@ -27,7 +27,7 @@ function inflate(s)
   -- get rid of n first bits
   local function flb(n)
     sn -= n
-    sb = shr(sb,n)
+    sb = lshr(sb,n)
   end
 
   -- peek n bits from the stream
@@ -39,9 +39,9 @@ function inflate(s)
       -- unpack the next 8 characters of base59 data into
       -- 47 bits of information that we insert into sb in
       -- chunks of 16 or 15 bits.
-      local x = 2^-16
-      local t = {9,579} -- these are the higher bits (>=32) of 59^7 and 59^8
       if state == 0 then
+        local x = 2^-16
+        local t = {9,579} -- these are the higher bits (>=32) of 59^7 and 59^8
         local p = 0 sb2 = 0
         for i=1,8 do
           local c = lut[sub(s,i,i)] or 0
@@ -59,12 +59,15 @@ function inflate(s)
         sn += 16
         state += 1
       else
-        sb += shr(sb2,16)*2^sn
+        sb += lshr(sb2,16)*2^sn
         sn += 15
         state = 0
       end
     end
-    return band(shl(sb,16),2^n-1)
+    return lshr(shl(sb,32-n),16-n)
+    -- this cannot work because of getb(16)
+    -- maybe bring this back if we disable uncompressed blocks
+    --return band(shl(sb,16),2^n-1)
   end
 
   -- get a number of n bits from stream and flush them
@@ -217,12 +220,12 @@ function inflate(s)
     -- align input buffer to byte (as per spec)
     -- fixme: we could omit this!
     flb(sn%8)
-    if sn > 0 then                                                   -- debug
+    if sn%8 != 0 then                                                -- debug
       error("unexpected.. should be zero remaining bits in buffer.") -- debug
     end                                                              -- debug
     local len = getb(16)
     local nlen = getb(16)
-    if bxor(len,nlen) != 0xffff then    -- debug
+    if bxor(len,nlen) != -1 then        -- debug
       error("len and nlen don't match") -- debug
     end                                 -- debug
     for i=1,len do

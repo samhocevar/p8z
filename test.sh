@@ -1,7 +1,15 @@
 #!/bin/sh
 
 PATH="$PATH:$HOME/zepto8"
+PATH="$PATH:$HOME/pico-8"
+
+export DISPLAY=:0
 TMPFILE=.p8z-temp.p8
+TOOL="z8tool --headless"
+if [ "x$1" = "x--pico8" ]; then
+  TMPFILE=.p8z-temp2.p8
+  TOOL="pico8 -x"
+fi
 
 minify() {
   head -n 3 "$1"
@@ -22,7 +30,7 @@ echo "# Inspecting: p8z.p8"
 minify p8z.p8 > "$TMPFILE"
 z8tool --inspect "$TMPFILE"
 echo "printh('Cart code: valid')" >> "$TMPFILE"
-z8tool --headless "$TMPFILE"
+$TOOL "$TMPFILE"
 echo ""
 
 # Check that the code works
@@ -37,8 +45,9 @@ test_string() {
   minify p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
   printf %s "$STR" | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1))) for i=0,#t do printh(tostr(t[i], true)) end' >> "$TMPFILE"
-  z8tool --headless "$TMPFILE"
+  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Compressed "..#c.." Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
+  out="$($TOOL "$TMPFILE")"
+  case "$out" in Compressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
 
 test_file() {
@@ -46,18 +55,16 @@ test_file() {
   minify p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
   cat $* | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) printh("Compressed bytes "..#c) printh("Uncompressed "..(4*(#t+1)))' >> "$TMPFILE"
-  z8tool --headless "$TMPFILE"
+  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Compressed "..#c.." Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
+  out="$($TOOL "$TMPFILE")"
+  case "$out" in Compressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
 
 test_string "to be or not to be"
 test_string "to be or not to be or to be or maybe not to be or maybe finally to be..."
 test_string "98398743287509834098332165732043059430973981643159327439827439217594327643982715432543"
 
-find ../payloads -type f | while read i; do echo; echo "-- $(grep $(basename $i) ../payload-log.txt | head -n 1) --"; test_file $i; done
-test_file p8z.p8
-test_file /etc/motd
-#test_file data2 data2
+find ../payloads -type f | tail -n +1 | while read i; do test_file $i; done
 
 #printf %s $STR | od -v -An -t x1 -w1000
 
