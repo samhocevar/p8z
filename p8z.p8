@@ -22,7 +22,7 @@ function inflate(s,p,l)
 
   -- init stream writer
   local out = {}    -- output array
-  local outpos = 0  -- output position
+  local outpos = 1  -- output position
 
   -- get rid of n first bits
   local function flb(n)

@@ -15,7 +15,6 @@ fi
 
 minify() {
   head -n 3 "$1"
-
 #  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
     | tr A-Z a-z \
@@ -23,8 +22,8 @@ minify() {
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
     | sed "$(echo mkhuf h do_block b methods f write w \
                   reverse r out o outpos op state e \
-                  hlit hl hdist hd lit l dist d last l \
-                  readback rb getb gb getv gv \
+                  hlit hl hdist hd hclen k lit l dist d last l size z \
+                  readback a getb g getv v pkb h lut u \
               | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
@@ -55,7 +54,7 @@ test_string() {
   minify p8z.p8 > "$TMPFILE"
   echo 'c=' >> "$TMPFILE"
   printf %s "$STR" | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
+  echo 't=inflate(c) x=0 for i=1,#t do x+=t[i] end printh("Uncompressed "..(4*#t).." Checksum "..tostr(x, true))' >> "$TMPFILE"
   out="$($TOOL "$TMPFILE")"
   case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
@@ -66,7 +65,7 @@ test_file() {
   echo 'c=' >> "$TMPFILE.tmp"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
   cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
-  echo "t=inflate(c,0,$EXTRA) x=0 for i=0,#t do x+=t[i] end printh('Uncompressed '..(4*(#t+1))..' Checksum '..tostr(x, true))" >> "$TMPFILE.tmp"
+  echo "t=inflate(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true))" >> "$TMPFILE.tmp"
   z8tool --data "$TMPFILE.data" "$TMPFILE.tmp" --top8 > "$TMPFILE"
   rm -f "$TMPFILE.tmp" "$TMPFILE.data"
   out="$($TOOL "$TMPFILE")"
