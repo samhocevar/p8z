@@ -65,10 +65,10 @@ std::string encode59(std::vector<uint8_t> const &v)
     ret = std::regex_replace(ret, std::regex("YYY_1"), "[]]..'[['..[[\n\n");
     ret = std::regex_replace(ret, std::regex("YYY_2"), "[]]..'[['..[[");
     ret = std::regex_replace(ret, std::regex("YYY_3"), "[]]..[[[");
-    // The newlines after "]]" are also required to avoid another bug:
+    // The newlines after "']]'" here are also required to avoid another bug,
     // reported for 1.1.11g: https://www.lexaloffle.com/bbs/?tid=32148
-    ret = std::regex_replace(ret, std::regex("XXX_1"), "]]\n..']]'..\n[[\n\n");
-    ret = std::regex_replace(ret, std::regex("XXX_2"), "]]\n..']]'..\n[[");
+    ret = std::regex_replace(ret, std::regex("XXX_1"), "]]..']]'\n..[[\n\n");
+    ret = std::regex_replace(ret, std::regex("XXX_2"), "]]..']]'\n..[[");
 
     // And finally, we cannot end with "]".
     if (ret.back() == ']')
