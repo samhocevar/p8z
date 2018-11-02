@@ -17,14 +17,16 @@ minify() {
   head -n 3 "$1"
 #  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
-    | sed 's/_ ",i,/PROTECTME/' \
+    | tr A-Z a-z \
+    | sed 's/_ ",i,/Z/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
+    | sed 's/.*[-+*/%]=.*/X&X/' \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
-    | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
-    | tr ' ' '\n' \
-    | sed 's/PROTECTME/_ ",i,/'
+    | sed 's/ *X[ X]*/ /g' \
+    | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
+    | sed 's/Z/_ ",i,/'
 }
 
 # Inspect p8z.p8 for stats
