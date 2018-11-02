@@ -2,4 +2,4 @@ p8z
 *.o
 zlib/.zlib.c
 .tmp.p8
-.p8z-temp.p8
+.p8z-*.p8

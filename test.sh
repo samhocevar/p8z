@@ -3,11 +3,13 @@
 PATH="$PATH:$HOME/zepto8"
 PATH="$PATH:$HOME/pico-8"
 
-export DISPLAY=:0
 TMPFILE=.p8z-temp.p8
+EXTRA=2048
+
 TOOL="z8tool --headless"
 if [ "x$1" = "x--pico8" ]; then
-  TMPFILE=.p8z-temp2.p8
+  export DISPLAY=:0
+  TMPFILE=.p8z-pico8.p8
   TOOL="pico8 -x"
 fi
 
@@ -45,19 +47,22 @@ test_string() {
   minify p8z.p8 > "$TMPFILE"
   echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
   printf %s "$STR" | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Compressed "..#c.." Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
+  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
   out="$($TOOL "$TMPFILE")"
-  case "$out" in Compressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
+  case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
 
 test_file() {
   echo "# Compressing files: $*"
-  minify p8z.p8 > "$TMPFILE"
-  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
-  cat $* | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Compressed "..#c.." Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
+  minify p8z.p8 > "$TMPFILE.tmp"
+  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE.tmp"
+  cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
+  cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
+  echo "t=inflate(c,0,$EXTRA) x=0 for i=0,#t do x+=t[i] end printh('Uncompressed '..(4*(#t+1))..' Checksum '..tostr(x, true))" >> "$TMPFILE.tmp"
+  z8tool --data "$TMPFILE.data" "$TMPFILE.tmp" --top8 > "$TMPFILE"
+  rm -f "$TMPFILE.tmp" "$TMPFILE.data"
   out="$($TOOL "$TMPFILE")"
-  case "$out" in Compressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
+  case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
 
 test_string "to be or not to be"

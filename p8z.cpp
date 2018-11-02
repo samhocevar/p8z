@@ -3,6 +3,7 @@
 #include <iostream>
 #include <streambuf>
 #include <cstdint>
+#include <cstdlib>
 #include <regex>
 
 extern "C" {
@@ -36,11 +37,11 @@ std::string encode59(std::vector<uint8_t> const &v)
     }
 
     // Remove trailing newlines
-    while (ret.back() == '\n')
+    while (ret.size() && ret.back() == '\n')
         ret.erase(ret.end() - 1);
 
     // If string starts with \n we need to add an extra \n for Lua
-    if (ret[0] == '\n')
+    if (ret.size() && ret[0] == '\n')
         ret = '\n' + ret;
 
 #if 1
@@ -82,7 +83,7 @@ std::string encode59(std::vector<uint8_t> const &v)
 #endif
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     std::vector<uint8_t> input;
     for (uint8_t ch : std::vector<char>{ std::istreambuf_iterator<char>(std::cin),
@@ -106,10 +107,25 @@ int main()
     output = std::vector<uint8_t>(output.begin() + 2, output.begin() + zs.total_out - 4);
     deflateEnd(&zs);
 
-#if 0
-    fwrite(output.data(), 1, output.size(), stdout);
-#else
+    if (argc == 3 && argv[1] == std::string("--count"))
+    {
+        size_t count = atoi(argv[2]);
+        fwrite(output.data(), 1, std::min(count, output.size()), stdout);
+        return EXIT_SUCCESS;
+    }
+
+    if (argc == 3 && argv[1] == std::string("--skip"))
+    {
+        size_t skip = atoi(argv[2]);
+        output.erase(output.begin(), output.begin() + std::min(skip, output.size()));
+    }
+    else if (argc != 1)
+    {
+        std::cerr << "Invalid arguments\n";
+        return EXIT_FAILURE;
+    }
+
     std::cout << encode59(output) << '\n';
-#endif
+    return EXIT_SUCCESS;
 }
 

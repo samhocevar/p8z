@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
-function inflate(s)
+function inflate(s,p,l)
   -- init reverse array
   local reverse = {}
   for i=0,255 do
@@ -30,6 +30,13 @@ function inflate(s)
     sb = lshr(sb,n)
   end
 
+  -- debug function to display hex numbers with minimal chars
+  local function strx(n)                                   -- debug
+    n = sub(tostr(n,1),3,6)                                -- debug
+    while #n > 1 and sub(n,1,1) == "0" do n = sub(n,2) end -- debug
+    return "0x"..n                                         -- debug
+  end                                                      -- debug
+
   -- peek n bits from the stream
   local function pkb(n)
     -- we need "while" instead of "do" because when reading
@@ -39,7 +46,12 @@ function inflate(s)
       -- unpack the next 8 characters of base59 data into
       -- 47 bits of information that we insert into sb in
       -- chunks of 16 or 15 bits.
-      if state == 0 then
+      if l and l > 0 then
+        sb += shr(peek(p),16-sn)
+        sn += 8
+        p += 1
+        l -= 1
+      elseif state == 0 then
         local x = 2^-16
         local t = {9,579} -- these are the higher bits (>=32) of 59^7 and 59^8
         local p = 0 sb2 = 0
@@ -64,6 +76,7 @@ function inflate(s)
         state = 0
       end
     end
+    --printh("pkb("..n..") = "..strx(lshr(shl(sb,32-n),16-n)).." [sb = "..strx(shl(sb,16)).."]")
     return lshr(shl(sb,32-n),16-n)
     -- this cannot work because of getb(16)
     -- maybe bring this back if we disable uncompressed blocks

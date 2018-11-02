@@ -5,7 +5,7 @@ CPPFLAGS = -I./zlib -DP8Z -DZ_SOLO -DNO_GZIP -DHAVE_MEMCPY -Dlocal= -Os -g -ggdb
 all: p8z
 
 clean:
-	rm -f *.o p8z zlib/.zlib.*
+	rm -f *.o .*.p8 p8z zlib/.zlib.*
 
 p8z: p8z.o zlib/.zlib.o
 	$(CXX) $(CPPFLAGS) $^ -o $@
