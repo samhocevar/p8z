@@ -15,11 +15,17 @@ fi
 
 minify() {
   head -n 3 "$1"
+
 #  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
     | tr A-Z a-z \
     | sed 's/_ ",i,/Z/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
+    | sed "$(echo mkhuf h do_block b methods f write w \
+                  reverse r out o outpos op state e \
+                  hlit hl hdist hd lit l dist d last l \
+                  readback rb getb gb getv gv \
+              | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
@@ -47,7 +53,7 @@ test_string() {
 
   echo "### PICO-8"
   minify p8z.p8 > "$TMPFILE"
-  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE"
+  echo 'c=' >> "$TMPFILE"
   printf %s "$STR" | ./p8z >> "$TMPFILE"
   echo 't=inflate(c) x=0 for i=0,#t do x+=t[i] end printh("Uncompressed "..(4*(#t+1)).." Checksum "..tostr(x, true))' >> "$TMPFILE"
   out="$($TOOL "$TMPFILE")"
@@ -57,7 +63,7 @@ test_string() {
 test_file() {
   echo "# Compressing files: $*"
   minify p8z.p8 > "$TMPFILE.tmp"
-  echo 'function error(m) printh("Error: "..tostr(m)) end c=' >> "$TMPFILE.tmp"
+  echo 'c=' >> "$TMPFILE.tmp"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
   cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
   echo "t=inflate(c,0,$EXTRA) x=0 for i=0,#t do x+=t[i] end printh('Uncompressed '..(4*(#t+1))..' Checksum '..tostr(x, true))" >> "$TMPFILE.tmp"

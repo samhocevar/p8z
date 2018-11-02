@@ -37,6 +37,12 @@ function inflate(s,p,l)
     return "0x"..n                                         -- debug
   end                                                      -- debug
 
+  -- handle error reporting
+  local function error(s) -- debug
+    printh(s)             -- debug
+    abort()               -- debug
+  end                     -- debug
+
   -- peek n bits from the stream
   local function pkb(n)
     -- we need "while" instead of "do" because when reading
