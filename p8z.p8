@@ -236,18 +236,11 @@ function inflate(s,p,l)
 
   -- inflate uncompressed byte array
   methods[0] = function()
-    -- align input buffer to byte (as per spec)
-    -- fixme: we could omit this!
-    flb(sn%8)
-    if sn%8 != 0 then                                                -- debug
-      error("unexpected.. should be zero remaining bits in buffer.") -- debug
-    end                                                              -- debug
-    local len = getb(16)
-    local nlen = getb(16)
-    if bxor(len,nlen) != -1 then        -- debug
-      error("len and nlen don't match") -- debug
-    end                                 -- debug
-    for i=1,len do
+    -- we do not align the input buffer to a byte boundary, because there
+    -- is no concept of byte boundary in a stream we read in 47-bit chunks.
+    -- also, we do not store the bit complement of the length value, it is
+    -- not really important with such small data.
+    for i=1,getb(16) do
       write(getb(8))
     end
   end

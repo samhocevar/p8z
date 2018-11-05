@@ -871,11 +871,17 @@ void ZLIB_INTERNAL _tr_stored_block(s, buf, stored_len, last)
     int last;         /* one if this is the last block for a file */
 {
     send_bits(s, (STORED_BLOCK<<1)+last, 3);    /* send block type */
+#if P8Z
+    send_bits(s, (ush)stored_len, 16);
+    for (ulg i = 0; i < stored_len; ++i)
+        send_bits(s, buf[i], 8);
+#else
     bi_windup(s);        /* align on byte boundary */
     put_short(s, (ush)stored_len);
     put_short(s, (ush)~stored_len);
     zmemcpy(s->pending_buf + s->pending, (Bytef *)buf, stored_len);
     s->pending += stored_len;
+#endif
 #ifdef ZLIB_DEBUG
     s->compressed_len = (s->compressed_len + 3 + 7) & (ulg)~7L;
     s->compressed_len += (stored_len + 4) << 3;

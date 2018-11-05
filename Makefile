@@ -18,6 +18,7 @@ zlib/.zlib.o: zlib/.zlib.c
 
 zlib/.zlib.c: zlib/deflate.c zlib/trees.c
 	echo '#include <string.h>' > $@
+	echo '#include <stdio.h>' >> $@
 	#echo '#include "zlib.h"' >> $@
 	echo '#include "zutil.h"' >> $@
 	echo '#define adler32(...) 0' >> $@
