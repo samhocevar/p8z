@@ -20,17 +20,18 @@ minify() {
     | tr A-Z a-z \
     | sed 's/_ ",i,/Z/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
-    | sed "$(echo mkhuf h do_block b methods f write w \
-                  reverse r out o outpos op state e \
-                  hlit hl hdist hd hclen k lit l dist d last l size z \
-                  readback a getb g getv v pkb h lut u \
-              | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
+    | sed "$( (sed -ne 's/-- replaces: //p' "$1"; \
+               echo do_block b methods a \
+                    out o d2 q \
+                    hlit hl hdist hd hclen k lit l dist d size r \
+                    readback a pkb h flb f \
+              ) | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
     | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
     | sed 's/ *X[ X]*/ /g' \
-    | sed 's/ *\([][<>(){}-+*\/=:!~-]\) */\1/g' \
+    | sed 's/ *\([][<>(){}-+*\/=:!~,-]\) */\1/g' \
     | sed 's/Z/_ ",i,/'
 }
 
