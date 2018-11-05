@@ -2,17 +2,34 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
+-- strategy for minifying (renaming variables):
+--
+-- first, we rename some internal tables:
+--   replaces: reverse z char_lut y methods m
+--
+-- then, we rename our state variables:
+--   replaces: state x bit_buffer w temp_buffer v sn u
+--
+-- "i" and "g" are used for function arguments, so that
+-- the string (i) appears as often as possible. we also
+-- use "i" for the huffman table's number of bits and "g"
+-- for the output position, because they are really only
+-- used very locally:
+--   replaces: outpos g max_bits i
+-- we can also rename this because "j" is only used as
+-- a local variable in functions that do not use output_buffer:
+--   replaces: output_buffer j
+--
+-- now we rename some functions:
+--   replaces: build_huff_tree h
+--
+-- this is valid because write_byte() is called after all uses of
+-- bit_buffer, same for getb()/state, getv()/sn:
+--   replaces: getv u write_byte w getb x
+--
+-- free variables: o
+
 function inflate(s, p, l)
-  -- free: m
-  -- replaces: reverse z char_lut y
-  -- replaces: state x bit_buffer w temp_buffer v sn u
-  -- replaces: outpos g max_bits i
-  -- replaces: build_huff_tree h
-
-  -- this is valid because write() is called after all uses of bit_buffer,
-  -- same for getb()/state, getv()/sn:
-  -- replaces: getv u write w getb x
-
   -- init reverse array
   local reverse = {}
   for i = 0, 255 do
@@ -31,8 +48,8 @@ function inflate(s, p, l)
   local sn = 0          -- number of bits in buffer
 
   -- init stream writer
-  local out = {}    -- output array
-  local outpos = 1  -- output position, only used in write() and readback()
+  local output_buffer = {} -- output array (32-bit numbers)
+  local outpos = 1         -- output position, only used in write_byte() and readback()
 
   -- get rid of n first bits
   local function flb(nbits)
@@ -122,12 +139,12 @@ function inflate(s, p, l)
     return flr(huff_tree[v])
   end
 
-  -- write 8 bits to the output, packed into a 32-bit number
-  local function write(nbits)
+  -- write_byte 8 bits to the output, packed into a 32-bit number
+  local function write_byte(nbits)
     -- replaces: nbits i
     local d = (outpos)%1  -- the parentheses here help compressing the code!
     local p = flr(outpos)
-    out[p] = nbits*256^(4*d-2)+(out[p]or 0)
+    output_buffer[p] = nbits*256^(4*d-2)+(output_buffer[p]or 0)
     outpos += 1/4
   end
 
@@ -136,7 +153,7 @@ function inflate(s, p, l)
     -- replaces: distance i
     local d = (outpos-distance/4)%1
     local distance = flr(outpos-distance/4)
-    return band(out[distance]/256^(4*d-2), 255)
+    return band(output_buffer[distance]/256^(4*d-2), 255)
   end
 
   -- build a huffman table
@@ -180,22 +197,22 @@ function inflate(s, p, l)
 
   -- decompress a block using the two huffman tables
   local function do_block(lit_tree, len_tree)
-    -- replaces: lit_tree g len_tree i
-    local lit
+    -- replaces: lit_tree g len_tree i symbol l
+    local symbol
     repeat
-      lit = getv(lit_tree)
-      if lit < 256 then
-        write(lit)
-      elseif lit > 256 then
-        lit -= 257
+      symbol = getv(lit_tree)
+      if symbol < 256 then
+        write_byte(symbol)
+      elseif symbol > 256 then
+        symbol -= 257
         local n = 0
         local size = 3
         local dist = 1
-        if lit < 8 then
-          size += lit
-        elseif lit < 28 then
-          n = flr(lit/4-1)
-          size += shl(lit%4+4, n)
+        if symbol < 8 then
+          size += symbol
+        elseif symbol < 28 then
+          n = flr(symbol/4-1)
+          size += shl(symbol%4+4, n)
           size += getb(n)
         else
           size = 258
@@ -209,37 +226,40 @@ function inflate(s, p, l)
           dist += getb(n)
         end
         for i = 1, size do
-          write(readback(dist))
+          write_byte(readback(dist))
         end
       end
-    until lit == 256
+    until symbol == 256
   end
 
   local methods = {}
 
   -- inflate dynamic block
   methods[2] = function()
+    -- replaces: lit_count l dist_count hd desc_len k
     local tree_desc = {}
-    local hlit = 257 + getb(5)
-    local hdist = 1 + getb(5)
-    local hclen = 4 + getb(4)
+    local lit_count = 257 + getb(5)
+    local dist_count = 1 + getb(5)
+    local desc_len = 4 + getb(4)
     for j = 1, 19 do
       -- the formula below differs from the original deflate
-      tree_desc[(j+15)%19+1] = j>hclen and 0 or getb(3)
+      tree_desc[(j+15)%19+1] = j>desc_len and 0 or getb(3)
     end
     local z = build_huff_tree(tree_desc)
     tree_desc = {}
     local d2 = {}
     local c = 0
-    while #tree_desc+#d2<hlit+hdist do
+    while #tree_desc + #d2 < lit_count + dist_count do
       local v = getv(z)
       if v >= 19 then                                                        -- debug
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end                                                                    -- debug
-      if v < 16 then c = v add(#tree_desc<hlit and tree_desc or d2, c) end
-      if v == 16 then for j =-2, getb(2) do add(#tree_desc<hlit and tree_desc or d2, c) end end
-      if v == 17 then c = 0 for j =-2, getb(3) do add(#tree_desc<hlit and tree_desc or d2, c) end end
-      if v == 18 then c = 0 for j =-2, getb(7)+8 do add(#tree_desc<hlit and tree_desc or d2, c) end end
+      -- fixme: use a temporary here because the for loop cannot pass through tables
+      -- (see send_all_trees() in zlib/trees.c)
+      if v < 16 then c = v add(#tree_desc < lit_count and tree_desc or d2, c) end
+      if v == 16 then for j =-2, getb(2) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      if v == 17 then c = 0 for j =-2, getb(3) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      if v == 18 then c = 0 for j =-2, getb(7)+8 do add(#tree_desc < lit_count and tree_desc or d2, c) end end
     end
     do_block(build_huff_tree(tree_desc), build_huff_tree(d2))
   end
@@ -261,7 +281,7 @@ function inflate(s, p, l)
     -- also, we do not store the bit complement of the length value, it is
     -- not really important with such small data.
     for i = 1, getb(16) do
-      write(getb(8))
+      write_byte(getb(8))
     end
   end
 
@@ -275,6 +295,6 @@ function inflate(s, p, l)
   end
   flb(sn%8)  -- debug (no need to flush!)
 
-  return out
+  return output_buffer
 end
 

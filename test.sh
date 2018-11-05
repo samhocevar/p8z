@@ -20,10 +20,10 @@ minify() {
     | tr A-Z a-z \
     | sed 's/_ ",i,/Z/' \
     | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
-    | sed "$( (sed -ne 's/-- replaces: //p' "$1"; \
-               echo do_block b methods a \
-                    out o d2 q \
-                    hlit hl hdist hd hclen k lit l dist d size r \
+    | sed "$( (sed -ne 's/.*-- *replaces: //p' "$1"; \
+               echo do_block b \
+                    d2 q \
+                    dist d size r \
                     readback a pkb h flb f \
               ) | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
