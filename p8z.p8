@@ -4,30 +4,54 @@ __lua__
 
 -- strategy for minifying (renaming variables):
 --
--- first, we rename some internal tables:
---   replaces: reverse z char_lut y methods m
+-- rename functions, in order of appearance:
+--   replaces: flush_bits f
+--   replaces: peek_bits h
+--   replaces: get_bits x
+--   replaces: getv u
+--   replaces: write_byte w
+--   replaces: readback_byte a    (todo)
+--   replaces: build_huff_tree h  (no conflict with peek_bits)
+--   replaces: do_block b         (todo)
 --
--- then, we rename our state variables:
---   replaces: state x bit_buffer w temp_buffer v sn u
+-- rename local variables in functions to the same name
+-- as their containing functions:
+--   replaces: tree h (in build_huff_tree)
+-- or not:
+--   replaces: symbol l     (local variable in do_block)
 --
--- "i" and "g" are used for function arguments, so that
--- the string (i) appears as often as possible. we also
--- use "i" for the huffman table's number of bits and "g"
--- for the output position, because they are really only
--- used very locally:
---   replaces: outpos g max_bits i
+-- first, we rename some internal variables:
+--   replaces: reverse z
+--   replaces: char_lut y methods y  (no conflict)
+--   replaces: state x               (valid because always used before get_bits)
+--   replaces: bit_buffer w          (valid because always used before write_byte)
+--   replaces: temp_buffer v
+--   replaces: sn u                  (valid because always used before getv)
+--   replaces: outpos g
+--
+-- "i" is typically used for function arguments, sometimes "g":
+--   replaces: nbits i      (first argument of get_bits/peek_bits/flush_bits)
+--   replaces: byte i       (first argument of write_byte)
+--   replaces: distance i   (first arg of readback_byte)
+--   replaces: huff_tree i  (first arg of getv)
+--   replaces: tree_desc i  (first arg of build_huff_tree)
+--   replaces: lit_tree g   (first arg of do_block, no conflict with outpos)
+--   replaces: len_tree i   (second arg of do_block)
+--
+-- this is not a local variable but a table member, however
+-- the string "i=1" appears just after it is initialised, so
+-- we can save one byte by calling it "i" too:
+--   replaces: max_bits i
+--
 -- we can also rename this because "j" is only used as
 -- a local variable in functions that do not use output_buffer:
 --   replaces: output_buffer j
 --
--- now we rename some functions:
---   replaces: build_huff_tree h
+-- not cleaned yet:
+--   replaces: d2 q dist d size r
+--   replaces: c0 o c1 m
 --
--- this is valid because write_byte() is called after all uses of
--- bit_buffer, same for getb()/state, getv()/sn:
---   replaces: getv u write_byte w getb x
---
--- free variables: o
+-- free: l
 
 function inflate(s, p, l)
   -- init reverse array
@@ -44,16 +68,15 @@ function inflate(s, p, l)
   -- init stream reader
   local state = 0       -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local bit_buffer = 0  -- bit buffer, starting from bit 0 (= 0x.0001)
-  local temp_buffer = 0 -- temp chunk buffer
   local sn = 0          -- number of bits in buffer
+  local temp_buffer = 0 -- temp chunk buffer
 
   -- init stream writer
   local output_buffer = {} -- output array (32-bit numbers)
-  local outpos = 1         -- output position, only used in write_byte() and readback()
+  local outpos = 1         -- output position, only used in write_byte() and readback_byte()
 
   -- get rid of n first bits
-  local function flb(nbits)
-    -- replaces: nbits i
+  local function flush_bits(nbits)
     sn -= nbits
     bit_buffer = lshr(bit_buffer, nbits)
   end
@@ -72,8 +95,8 @@ function inflate(s, p, l)
   end                     -- debug
 
   -- peek n bits from the stream
-  local function pkb(nbits)
-    -- replaces: nbits i highbits j
+  local function peek_bits(nbits)
+    -- replaces: highbits j
     -- we need "while" instead of "do" because when reading
     -- from memory we may need more than one 8-bit run.
     while sn < nbits do
@@ -112,45 +135,42 @@ function inflate(s, p, l)
         state = 0
       end
     end
-    --printh("pkb("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits)).." [bit_buffer = "..strx(shl(bit_buffer, 16)).."]")
+    --printh("peek_bits("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits))
+    --       .." [bit_buffer = "..strx(shl(bit_buffer, 16)).."]")
     return lshr(shl(bit_buffer, 32-nbits), 16-nbits)
-    -- this cannot work because of getb(16)
-    -- maybe bring this back if we disable uncompressed blocks
+    -- this cannot work because of get_bits(16)
+    -- maybe bring this back if we disable uncompressed blocks?
     --return band(shl(bit_buffer, 16), 2^nbits-1)
   end
 
   -- get a number of n bits from stream and flush them
-  local function getb(nbits)
-    -- replaces: nbits i
-    return pkb(nbits), flb(nbits)
+  local function get_bits(nbits)
+    return peek_bits(nbits), flush_bits(nbits)
   end
 
   -- get next variable value from stream, according to huffman table
   local function getv(huff_tree)
-    -- replaces: huff_tree i
     -- require at least n bits, even if only p<n bytes may be actually consumed
-    pkb(huff_tree.max_bits)
+    peek_bits(huff_tree.max_bits)
     -- reverse using a 16-bit word
     -- fixme: maybe we could get rid of reversing in the encoder?
     local h = reverse[band(shl(bit_buffer, 16), 255)]
     local l = reverse[band(shl(bit_buffer, 8), 255)]
     local v = band(shr(256*h+l, 16-huff_tree.max_bits), 2^huff_tree.max_bits-1)
-    flb(huff_tree[v]%1*16)
+    flush_bits(huff_tree[v]%1*16)
     return flr(huff_tree[v])
   end
 
   -- write_byte 8 bits to the output, packed into a 32-bit number
-  local function write_byte(nbits)
-    -- replaces: nbits i
+  local function write_byte(byte)
     local d = (outpos)%1  -- the parentheses here help compressing the code!
     local p = flr(outpos)
-    output_buffer[p] = nbits*256^(4*d-2)+(output_buffer[p]or 0)
+    output_buffer[p] = byte*256^(4*d-2)+(output_buffer[p]or 0)
     outpos += 1/4
   end
 
   -- read back 8 bits from the output, at offset -p
-  local function readback(distance)
-    -- replaces: distance i
+  local function readback_byte(distance)
     local d = (outpos-distance/4)%1
     local distance = flr(outpos-distance/4)
     return band(output_buffer[distance]/256^(4*d-2), 255)
@@ -158,7 +178,6 @@ function inflate(s, p, l)
 
   -- build a huffman table
   local function build_huff_tree(tree_desc)
-    -- replaces: tree_desc i tree h
     local tree = {max_bits = 1}
     -- fill c with the bit length counts
     local c = {}
@@ -197,7 +216,6 @@ function inflate(s, p, l)
 
   -- decompress a block using the two huffman tables
   local function do_block(lit_tree, len_tree)
-    -- replaces: lit_tree g len_tree i symbol l
     local symbol
     repeat
       symbol = getv(lit_tree)
@@ -213,7 +231,7 @@ function inflate(s, p, l)
         elseif symbol < 28 then
           n = flr(symbol/4-1)
           size += shl(symbol%4+4, n)
-          size += getb(n)
+          size += get_bits(n)
         else
           size = 258
         end
@@ -223,10 +241,10 @@ function inflate(s, p, l)
         else
           n = flr(v/2-1)
           dist += shl(v%2+2, n)
-          dist += getb(n)
+          dist += get_bits(n)
         end
         for i = 1, size do
-          write_byte(readback(dist))
+          write_byte(readback_byte(dist))
         end
       end
     until symbol == 256
@@ -238,12 +256,12 @@ function inflate(s, p, l)
   methods[2] = function()
     -- replaces: lit_count l dist_count hd desc_len k
     local tree_desc = {}
-    local lit_count = 257 + getb(5)
-    local dist_count = 1 + getb(5)
-    local desc_len = 4 + getb(4)
+    local lit_count = 257 + get_bits(5)
+    local dist_count = 1 + get_bits(5)
+    local desc_len = 4 + get_bits(4)
     for j = 1, 19 do
       -- the formula below differs from the original deflate
-      tree_desc[(j+15)%19+1] = j>desc_len and 0 or getb(3)
+      tree_desc[(j+15)%19+1] = j>desc_len and 0 or get_bits(3)
     end
     local z = build_huff_tree(tree_desc)
     tree_desc = {}
@@ -257,9 +275,9 @@ function inflate(s, p, l)
       -- fixme: use a temporary here because the for loop cannot pass through tables
       -- (see send_all_trees() in zlib/trees.c)
       if v < 16 then c = v add(#tree_desc < lit_count and tree_desc or d2, c) end
-      if v == 16 then for j =-2, getb(2) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
-      if v == 17 then c = 0 for j =-2, getb(3) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
-      if v == 18 then c = 0 for j =-2, getb(7)+8 do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      if v == 16 then for j =-2, get_bits(2) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      if v == 17 then c = 0 for j =-2, get_bits(3) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      if v == 18 then c = 0 for j =-2, get_bits(7)+8 do add(#tree_desc < lit_count and tree_desc or d2, c) end end
     end
     do_block(build_huff_tree(tree_desc), build_huff_tree(d2))
   end
@@ -280,8 +298,8 @@ function inflate(s, p, l)
     -- is no concept of byte boundary in a stream we read in 47-bit chunks.
     -- also, we do not store the bit complement of the length value, it is
     -- not really important with such small data.
-    for i = 1, getb(16) do
-      write_byte(getb(8))
+    for i = 1, get_bits(16) do
+      write_byte(get_bits(8))
     end
   end
 
@@ -290,10 +308,10 @@ function inflate(s, p, l)
     error("unsupported block type") -- debug
   end                               -- debug
 
-  while getb(1)>0 do
-    methods[getb(2)]()
+  while get_bits(1)>0 do
+    methods[get_bits(2)]()
   end
-  flb(sn%8)  -- debug (no need to flush!)
+  flush_bits(sn%8)  -- debug (no need to flush!)
 
   return output_buffer
 end
