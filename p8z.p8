@@ -30,13 +30,15 @@ __lua__
 --   replaces: outpos g
 --
 -- "i" is typically used for function arguments, sometimes "g":
---   replaces: nbits i      (first argument of get_bits/peek_bits/flush_bits)
---   replaces: byte i       (first argument of write_byte)
---   replaces: distance i   (first arg of readback_byte)
---   replaces: huff_tree i  (first arg of getv)
---   replaces: tree_desc i  (first arg of build_huff_tree)
---   replaces: lit_tree g   (first arg of do_block, no conflict with outpos)
---   replaces: len_tree i   (second arg of do_block)
+--   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
+--   replaces: byte i           (first argument of write_byte)
+--   replaces: distance i       (first arg of readback_byte)
+--   replaces: huff_tree i      (first arg of getv)
+--   replaces: tree_desc i      (first arg of build_huff_tree)
+--   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
+--   replaces: len_tree_desc q
+--   replaces: lit_tree g       (first arg of do_block, no conflict with outpos)
+--   replaces: len_tree i       (second arg of do_block)
 --
 -- this is not a local variable but a table member, however
 -- the string "i=1" appears just after it is initialised, so
@@ -48,7 +50,7 @@ __lua__
 --   replaces: output_buffer j
 --
 -- not cleaned yet:
---   replaces: d2 q dist d size r
+--   replaces: dist d size r
 --   replaces: c0 o c1 m
 --
 -- free: l
@@ -254,42 +256,45 @@ function inflate(s, p, l)
 
   -- inflate dynamic block
   methods[2] = function()
-    -- replaces: lit_count l dist_count hd desc_len k
+    -- replaces: lit_count l len_count hd desc_len k
     local tree_desc = {}
     local lit_count = 257 + get_bits(5)
-    local dist_count = 1 + get_bits(5)
+    local len_count = 1 + get_bits(5)
     local desc_len = 4 + get_bits(4)
     for j = 1, 19 do
       -- the formula below differs from the original deflate
       tree_desc[(j+15)%19+1] = j>desc_len and 0 or get_bits(3)
     end
     local z = build_huff_tree(tree_desc)
-    tree_desc = {}
-    local d2 = {}
+    local lit_tree_desc = {}
+    local len_tree_desc = {}
     local c = 0
-    while #tree_desc + #d2 < lit_count + dist_count do
+    while #lit_tree_desc + #len_tree_desc < lit_count + len_count do
       local v = getv(z)
       if v >= 19 then                                                        -- debug
         error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
       end                                                                    -- debug
       -- fixme: use a temporary here because the for loop cannot pass through tables
       -- (see send_all_trees() in zlib/trees.c)
-      if v < 16 then c = v add(#tree_desc < lit_count and tree_desc or d2, c) end
-      if v == 16 then for j =-2, get_bits(2) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
-      if v == 17 then c = 0 for j =-2, get_bits(3) do add(#tree_desc < lit_count and tree_desc or d2, c) end end
-      if v == 18 then c = 0 for j =-2, get_bits(7)+8 do add(#tree_desc < lit_count and tree_desc or d2, c) end end
+      local z = #lit_tree_desc < lit_count and lit_tree_desc or len_tree_desc
+      if v < 16 then c = v add(z, c) end
+      if v == 16 then for j =-2, get_bits(2) do add(z, c) end end
+      if v == 17 then c = 0 for j =-2, get_bits(3) do add(z, c) end end
+      if v == 18 then c = 0 for j =-2, get_bits(7)+8 do add(z, c) end end
     end
-    do_block(build_huff_tree(tree_desc), build_huff_tree(d2))
+    do_block(build_huff_tree(lit_tree_desc),
+             build_huff_tree(len_tree_desc))
   end
 
   -- inflate static block
   methods[1] = function()
-    local tree_desc = {}
-    for j = 1, 288 do tree_desc[j] = 8 end
-    for j = 145, 280 do tree_desc[j] += sgn(256-j) end
-    local d2 = {}
-    for j = 1, 32 do d2[j] = 5 end
-    do_block(build_huff_tree(tree_desc), build_huff_tree(d2))
+    local lit_tree_desc = {}
+    for j = 1, 288 do lit_tree_desc[j] = 8 end
+    for j = 145, 280 do lit_tree_desc[j] += sgn(256-j) end
+    local len_tree_desc = {}
+    for j = 1, 32 do len_tree_desc[j] = 5 end
+    do_block(build_huff_tree(lit_tree_desc),
+             build_huff_tree(len_tree_desc))
   end
 
   -- inflate uncompressed byte array
