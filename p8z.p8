@@ -250,10 +250,9 @@ function inflate(s,p,l)
     error("unsupported block type") -- debug
   end                               -- debug
 
-  repeat
-    local last = getb(1)
+  while getb(1)>0 do
     methods[getb(2)]()
-  until last == 1
+  end
   flb(sn%8)  -- debug (no need to flush!)
 
   return out

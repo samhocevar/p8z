@@ -870,12 +870,14 @@ void ZLIB_INTERNAL _tr_stored_block(s, buf, stored_len, last)
     ulg stored_len;   /* length of input block */
     int last;         /* one if this is the last block for a file */
 {
-    send_bits(s, (STORED_BLOCK<<1)+last, 3);    /* send block type */
 #if P8Z
+    (void)last;
+    send_bits(s, (STORED_BLOCK<<1)+1, 3);    /* send block type */
     send_bits(s, (ush)stored_len, 16);
     for (ulg i = 0; i < stored_len; ++i)
         send_bits(s, buf[i], 8);
 #else
+    send_bits(s, (STORED_BLOCK<<1)+last, 3);    /* send block type */
     bi_windup(s);        /* align on byte boundary */
     put_short(s, (ush)stored_len);
     put_short(s, (ush)~stored_len);
@@ -985,14 +987,22 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
 #else
     } else if (s->strategy == Z_FIXED || static_lenb == opt_lenb) {
 #endif
+#ifdef P8Z
+        send_bits(s, (STATIC_TREES<<1)+1, 3);
+#else
         send_bits(s, (STATIC_TREES<<1)+last, 3);
+#endif
         compress_block(s, (const ct_data *)static_ltree,
                        (const ct_data *)static_dtree);
 #ifdef ZLIB_DEBUG
         s->compressed_len += 3 + s->static_len;
 #endif
     } else {
+#ifdef P8Z
+        send_bits(s, (DYN_TREES<<1)+1, 3);
+#else
         send_bits(s, (DYN_TREES<<1)+last, 3);
+#endif
         send_all_trees(s, s->l_desc.max_code+1, s->d_desc.max_code+1,
                        max_blindex+1);
         compress_block(s, (const ct_data *)s->dyn_ltree,
@@ -1008,6 +1018,9 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
     init_block(s);
 
     if (last) {
+#ifdef P8Z
+        send_bits(s, 0, 1);
+#endif
         bi_windup(s);
 #ifdef ZLIB_DEBUG
         s->compressed_len += 7;  /* align on byte boundary */
