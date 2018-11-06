@@ -224,7 +224,7 @@ function inflate(s, p, l)
           size += shl(symbol % 4 + 4, n)
           size += get_bits(n)
         else
-          size = 258
+          size += 255
         end
         local v = getv(len_tree)
         if v < 4 then
@@ -278,9 +278,9 @@ function inflate(s, p, l)
   -- inflate static block
   methods[1] = function()
     local lit_tree_desc = {}
+    local len_tree_desc = {}
     for j = 1, 288 do lit_tree_desc[j] = 8 end
     for j = 145, 280 do lit_tree_desc[j] += sgn(256 - j) end
-    local len_tree_desc = {}
     for j = 1, 32 do len_tree_desc[j] = 5 end
     do_block(build_huff_tree(lit_tree_desc),
              build_huff_tree(len_tree_desc))
