@@ -18,7 +18,7 @@ __lua__
 -- as their containing functions:
 --   replaces: tree h (in build_huff_tree)
 -- or not:
---   replaces: symbol l     (local variable in do_block)
+--   replaces: symbol l len_code l  (local variables in do_block)
 --
 -- first, we rename some internal variables:
 --   replaces: char_lut y methods y  (no conflict)
@@ -210,12 +210,11 @@ function inflate(s, p, l)
 
   -- decompress a block using the two huffman tables
   local function do_block(lit_tree, len_tree)
-    local symbol
-    repeat
-      symbol = getv(lit_tree)
+    local symbol = getv(lit_tree)
+    while symbol != 256 do
       if symbol < 256 then
         write_byte(symbol)
-      elseif symbol > 256 then
+      else
         symbol -= 257
         local n = 0
         local size = 3
@@ -229,19 +228,20 @@ function inflate(s, p, l)
         else
           size += 255
         end
-        local v = getv(len_tree)
-        if v < 4 then
-          dist += v
+        local len_code = getv(len_tree)
+        if len_code < 4 then
+          dist += len_code
         else
-          n = flr(v / 2 - 1)
-          dist += shl(v % 2 + 2, n)
+          n = flr(len_code / 2 - 1)
+          dist += shl(len_code % 2 + 2, n)
           dist += get_bits(n)
         end
         for i = 1, size do
           write_byte(readback_byte(dist))
         end
       end
-    until symbol == 256
+      symbol = getv(lit_tree)
+    end
   end
 
   local methods = {}
