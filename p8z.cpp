@@ -13,7 +13,7 @@ extern z_const char * const z_errmsg[] = {};
 
 std::string encode59(std::vector<uint8_t> const &v)
 {
-    char const *chr = "\n0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_ ";
+    char const *chr = "\ny={9,570123468functio[lshrabdegjkmpqvwxz!#%()]}<>+/*:;.~_ ";
     int const n = 47;
     int const p = 59;
 

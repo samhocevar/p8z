@@ -47,7 +47,6 @@ __lua__
 -- we can also rename this because "j" is only used as
 -- a local variable in functions that do not use output_buffer:
 --   replaces: output_buffer j
---   replaces: msb_lut j
 --
 -- not cleaned yet:
 --   replaces: dist d size r
@@ -85,9 +84,14 @@ function inflate(s, p, l)
     abort()               -- debug
   end                     -- debug
 
-  -- init char lookup method for peek_bits()
-  local char_lut = {}
-  for i = 1, 58 do char_lut[sub("0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_ ", i, i)] = i end
+  -- init lookup table for peek_bits()
+  --  - indices 1 and 2 are the higher bits (>=32) of 59^7 and 59^8
+  --    used to compute these powers
+  --  - string indices are for char -> byte lookups; the order in the
+  --    base string is not important but we exploit it to make our
+  --    compressed code shorter
+  local char_lut = { 9, 579 }
+  for i = 1, 58 do char_lut[sub("y={9,570123468functio[lshrabdegjkmpqvwxz!#%()]}<>+/*:;.~_ ", i, i)] = i end
 
   -- peek n bits from the stream
   local function peek_bits(nbits)
@@ -106,12 +110,11 @@ function inflate(s, p, l)
         l -= 1
       elseif state == 0 then
         local e = 2^-16
-        local msb_lut = { 9, 579 } -- these are the higher bits (>=32) of 59^7 and 59^8
         local p = 0 temp_buffer = 0
         for i = 1, 8 do
           local c = char_lut[sub(s, i, i)] or 0
           temp_buffer += e % 1 * c
-          p += (lshr(e, 16) + (msb_lut[i - 6] or 0)) * c
+          p += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
           e *= 59
         end
         s = sub(s, 9)
