@@ -21,7 +21,6 @@ __lua__
 --   replaces: symbol l     (local variable in do_block)
 --
 -- first, we rename some internal variables:
---   replaces: reverse z
 --   replaces: char_lut y methods y  (no conflict)
 --   replaces: state x               (valid because always used before get_bits)
 --   replaces: bit_buffer w          (valid because always used before write_byte)
@@ -52,9 +51,9 @@ __lua__
 --
 -- not cleaned yet:
 --   replaces: dist d size r
---   replaces: c0 o c1 m
+--   replaces: code o c1 m
 --
--- free: l
+-- free: l z
 
 function inflate(s, p, l)
   -- init stream reader
@@ -143,24 +142,12 @@ function inflate(s, p, l)
     return peek_bits(nbits), flush_bits(nbits)
   end
 
-  -- init reverse array for getv()
-  local reverse = {}
-  for i = 0, 255 do
-    reverse[i] = 0
-    for j = 0, 7 do reverse[i] += band(i, 2 ^ j) * 128 / 4 ^ j end
-  end
-
   -- get next variable value from stream, according to huffman table
   local function getv(huff_tree)
     -- require at least n bits, even if only p<n bytes may be actually consumed
-    peek_bits(huff_tree.max_bits)
-    -- reverse using a 16-bit word
-    -- fixme: maybe we could get rid of reversing in the encoder?
-    local h = reverse[band(shl(bit_buffer, 16), 255)]
-    local l = reverse[band(shl(bit_buffer, 8), 255)]
-    local v = band(shr(256 * h + l, 16 - huff_tree.max_bits), 2 ^ huff_tree.max_bits - 1)
-    flush_bits(huff_tree[v] % 1 * 16)
-    return flr(huff_tree[v])
+    local j = peek_bits(huff_tree.max_bits)
+    flush_bits(huff_tree[j] % 1 * 16)
+    return flr(huff_tree[j])
   end
 
   -- write_byte 8 bits to the output, packed into a 32-bit number
@@ -183,8 +170,8 @@ function inflate(s, p, l)
     local tree = { max_bits = 1 }
     -- fill c with the bit length counts
     local c = {}
-    for i = 1, 17 do
-      c[i] = 0
+    for j = 1, 17 do
+      c[j] = 0
     end
     for j = 1, #tree_desc do
       -- fixme: get rid of the local?
@@ -194,23 +181,25 @@ function inflate(s, p, l)
     end
     -- replace the contents of c with the next code lengths
     c[1] = 0
-    for i = 2, tree.max_bits do
-      c[i] += c[i-1]
-      c[i] += c[i-1]
+    for j = 2, tree.max_bits do
+      c[j] += c[j-1]
+      c[j] += c[j-1]
     end
-    -- fill tree with the proper codes
+    -- fill tree with the possible codes, pre-flipped so that we do not
+    -- have to reverse every chunk we read.
     for j = 1, #tree_desc do
       local l = tree_desc[j]
       if l > 0 then
-        local c0 = shl(c[l], tree.max_bits - l)
-        c[l] += 1
-        local c1 = shl(c[l], tree.max_bits - l)
-        if c1 > shl(1, tree.max_bits) then -- debug
-          error("code error")              -- debug
-        end                                -- debug
-        for i = c0, c1 - 1 do
-          tree[i] = j - 1 + l / 16
+        -- flip the first l bits of c[l]
+        local code = 0
+        for j = 1, l do code += shl(band(shr(c[l], j - 1), 1), l - j) end
+        -- store all possible n-bit values that end with flip(c[l])
+        while code < 2 ^ tree.max_bits do
+          tree[code] = j - 1 + l / 16
+          code += 2 ^ l
         end
+        -- point to next code of length l
+        c[l] += 1
       end
     end
     return tree
@@ -277,9 +266,9 @@ function inflate(s, p, l)
       -- it is legal to precompute z here because the trees are read separately
       -- (see send_all_trees() in zlib/trees.c)
       local z = #lit_tree_desc < lit_count and lit_tree_desc or len_tree_desc
-      if v < 16 then c = v add(z, c) end
-      if v == 16 then for j = -2, get_bits(2) do add(z, c) end end
-      if v == 17 then c = 0 for j = -2, get_bits(3) do add(z, c) end end
+      if v < 16  then c = v add(z, c) end
+      if v == 16 then       for j = -2, get_bits(2)     do add(z, c) end end
+      if v == 17 then c = 0 for j = -2, get_bits(3)     do add(z, c) end end
       if v == 18 then c = 0 for j = -2, get_bits(7) + 8 do add(z, c) end end
     end
     do_block(build_huff_tree(lit_tree_desc),

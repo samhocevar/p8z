@@ -19,11 +19,11 @@ minify() {
   cat "$1" | tail -n +4 \
     | tr A-Z a-z \
     | sed 's/_ ",i,/Z/' \
-    | grep -v -- "-- *debug" | sed 's/^  *//' | sed 's/ *--.*//' | grep . \
+    | grep -v -- '-- *debug' | sed 's/--.*//' | grep . \
     | sed "$(sed -ne 's/.*-- *replaces: //p' "$1" | sed -e 's/([^)]*)//g' \
               | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
-    | tr '\n' ' ' | sed 's/ *$//' | awk '{ print $0 }' \
+    | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ *$//' | awk '{ print $0 }' \
     | sed 's/\(0\) \([g-wyz]\)/\1\2/g' \
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
     | sed 's/ *X[ X]*/ /g' \
