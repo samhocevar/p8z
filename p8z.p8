@@ -149,7 +149,9 @@ function inflate(data_string, data_address, data_length)
     output_pos += 1 / 4
   end
 
+  --
   -- decompress a block using the two huffman tables
+  --
   local function do_block(lit_tree, len_tree)
 
     local function get_int(symbol, n)
@@ -178,68 +180,64 @@ function inflate(data_string, data_address, data_length)
     end
   end
 
-  local methods = {}
-
-  -- inflate dynamic block
-  methods[2] = function()
-    -- replaces: lit_count l len_count y count l desc_len k
-    local lit_count = 257 + get_bits(5)
-    local len_count = 1 + get_bits(5)
-    -- fixme: maybe this can be removed when build_huff_tree accepts sparse tables
-    local tree_desc = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-    -- the formula below differs from the original deflate
-    for j = -3, get_bits(4) do tree_desc[j % 19 + 1] = get_bits(3) end
-    local z = build_huff_tree(tree_desc)
-
-    local function read_tree(count)
-      local tree_desc = {}
-      while #tree_desc < count do
-        local v = get_symbol(z)
-        if v >= 19 then                                                        -- debug
-          error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
-        end                                                                    -- debug
-            if v == 16 then for j = -2, get_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
-        elseif v == 17 then for j = -2, get_bits(3)     do add(tree_desc, 0) end
-        elseif v == 18 then for j = -2, get_bits(7) + 8 do add(tree_desc, 0) end
-        else add(tree_desc, v) end
-      end
-      return build_huff_tree(tree_desc)
-    end
-
-    do_block(read_tree(lit_count), read_tree(len_count))
-  end
-
-  -- inflate static block
-  methods[1] = function()
-    local lit_tree_desc = {}
-    local len_tree_desc = {}
-    for j = 1, 288 do lit_tree_desc[j] = 8 end
-    for j = 145, 280 do lit_tree_desc[j] += sgn(256 - j) end
-    for j = 1, 32 do len_tree_desc[j] = 5 end
-    do_block(build_huff_tree(lit_tree_desc),
-             build_huff_tree(len_tree_desc))
-  end
-
-  -- inflate uncompressed byte array
-  methods[0] = function()
-    -- we do not align the input buffer to a byte boundary, because there
-    -- is no concept of byte boundary in a stream we read in 47-bit chunks.
-    -- also, we do not store the bit complement of the length value, it is
-    -- not really important with such small data.
-    for i = 1, get_bits(16) do
-      write_byte(get_bits(8))
-    end
-  end
-
-  -- block type 3 does not exist
-  methods[3] = function()           -- debug
-    error("unsupported block type") -- debug
-  end                               -- debug
-
+  --
+  -- main loop
+  --
   while get_bits(1) > 0 do
-    methods[get_bits(2)]()
+    local i = get_bits(2)
+    -- block type 3 does not exist
+    if i == 3 then                    -- debug
+      error("unsupported block type") -- debug
+    end                               -- debug
+    if i < 1 then
+      -- inflate uncompressed byte array
+      -- we do not align the input buffer to a byte boundary, because there
+      -- is no concept of byte boundary in a stream we read in 47-bit chunks.
+      -- also, we do not store the bit complement of the length value, it is
+      -- not really important with such small data.
+      for i = 1, get_bits(16) do
+        write_byte(get_bits(8))
+      end
+    else
+      -- replaces: lit_count l len_count y count j
+      local lit_tree_desc = {}
+      local len_tree_desc = {}
+      if i < 2 then
+        -- inflate static block
+        for j =   1, 288 do lit_tree_desc[j] = 8 end
+        for j = 145, 280 do lit_tree_desc[j] += sgn(256 - j) end
+        for j =   1,  32 do len_tree_desc[j] = 5 end
+      else
+        -- inflate dynamic block
+        local lit_count = 257 + get_bits(5)
+        local len_count = 1 + get_bits(5)
+        -- fixme: maybe this can be removed when build_huff_tree accepts sparse tables
+        local tree_desc = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+        -- the formula below differs from the original deflate
+        for j = -3, get_bits(4) do tree_desc[j % 19 + 1] = get_bits(3) end
+        local z = build_huff_tree(tree_desc)
+
+        local function read_tree(tree_desc, count)
+          while #tree_desc < count do
+            local v = get_symbol(z)
+            if v >= 19 then                                                        -- debug
+              error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
+            end                                                                    -- debug
+                if v == 16 then for j = -2, get_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
+            elseif v == 17 then for j = -2, get_bits(3)     do add(tree_desc, 0) end
+            elseif v == 18 then for j = -2, get_bits(7) + 8 do add(tree_desc, 0) end
+            else add(tree_desc, v) end
+          end
+        end
+
+        read_tree(lit_tree_desc, lit_count)
+        read_tree(len_tree_desc, len_count)
+      end
+
+      do_block(build_huff_tree(lit_tree_desc),
+               build_huff_tree(len_tree_desc))
+    end
   end
-  flush_bits(available_bits % 8)  -- debug (no need to flush!)
 
   return output_buffer
 end
@@ -264,11 +262,11 @@ end
 --   replaces: symbol l len_code l  (local variables in do_block)
 --
 -- first, we rename some internal variables:
---   replaces: char_lut y methods y  (no conflict)
---   replaces: state x               (valid because always used before get_bits)
---   replaces: bit_buffer w          (valid because always used before write_byte)
+--   replaces: char_lut y
+--   replaces: state x          (valid because always used before get_bits)
+--   replaces: bit_buffer w     (valid because always used before write_byte)
 --   replaces: temp_buffer v
---   replaces: available_bits u      (valid because always used before get_symbol)
+--   replaces: available_bits u (valid because always used before get_symbol)
 --   replaces: output_pos g
 --
 -- "i" is typically used for function arguments, sometimes "q":
@@ -276,10 +274,11 @@ end
 --   replaces: byte i           (first argument of write_byte)
 --   replaces: huff_tree i      (first arg of get_symbol)
 --   replaces: tree_desc i      (first arg of build_huff_tree)
---   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
---   replaces: len_tree_desc q
 --   replaces: lit_tree o       (first arg of do_block)
 --   replaces: len_tree i       (second arg of do_block)
+--
+--   replaces: lit_tree_desc k  (only appears after tree_desc is no longer used)
+--   replaces: len_tree_desc q
 --
 -- this is not a local variable but a table member, however
 -- the string "i=1" appears just after it is initialised, so
