@@ -9,10 +9,6 @@ function inflate(s, p, l)
   local available_bits = 0  -- number of bits in buffer
   local temp_buffer = 0     -- temp chunk buffer
 
-  -- init stream writer
-  local output_buffer = {} -- output array (32-bit numbers)
-  local output_pos = 1     -- output position, only used in write_byte() and readback_byte()
-
   -- get rid of n first bits
   local function flush_bits(nbits)
     available_bits -= nbits
@@ -101,21 +97,6 @@ function inflate(s, p, l)
     return flr(huff_tree[j])
   end
 
-  -- write_byte 8 bits to the output, packed into a 32-bit number
-  local function write_byte(byte)
-    local d = (output_pos) % 1  -- the parentheses here help compressing the code!
-    local p = flr(output_pos)
-    output_buffer[p] = byte * 256 ^ (4 * d - 2) + (output_buffer[p] or 0)
-    output_pos += 1 / 4
-  end
-
-  -- read back 8 bits from the output, at offset -p
-  local function readback_byte(distance)
-    local d = (output_pos - distance / 4) % 1
-    local distance = flr(output_pos - distance / 4)
-    return band(output_buffer[distance] / 256 ^ (4 * d - 2), 255)
-  end
-
   -- build a huffman table
   local function build_huff_tree(tree_desc)
     local tree = { max_bits = 1 }
@@ -156,6 +137,18 @@ function inflate(s, p, l)
     return tree
   end
 
+  -- init stream writer
+  local output_buffer = {} -- output array (32-bit numbers)
+  local output_pos = 1     -- output position, only used in write_byte() and do_block()
+
+  -- write_byte 8 bits to the output, packed into a 32-bit number
+  local function write_byte(byte)
+    local d = (output_pos) % 1  -- the parentheses here help compressing the code!
+    local p = flr(output_pos)
+    output_buffer[p] = byte * 256 ^ (4 * d - 2) + (output_buffer[p] or 0)
+    output_pos += 1 / 4
+  end
+
   -- decompress a block using the two huffman tables
   local function do_block(lit_tree, len_tree)
 
@@ -173,9 +166,12 @@ function inflate(s, p, l)
         write_byte(symbol)
       else
         local size = symbol < 285 and get_int(symbol - 257, 4) or 255
-        local dist = 1 + get_int(get_symbol(len_tree), 2)
+        local distance = 1 + get_int(get_symbol(len_tree), 2)
         for i = -2, size do
-          write_byte(readback_byte(dist))
+          -- read back one byte and append it to the output
+          local d = (output_pos - distance / 4) % 1
+          i = flr(output_pos - distance / 4)
+          write_byte(band(output_buffer[i] / 256 ^ (4 * d - 2), 255))
         end
       end
       symbol = get_symbol(lit_tree)
@@ -256,7 +252,6 @@ end
 --   replaces: get_bits x
 --   replaces: get_symbol u
 --   replaces: write_byte w
---   replaces: readback_byte a    (todo)
 --   replaces: build_huff_tree h  (no conflict with peek_bits)
 --   replaces: do_block b         (todo)
 --
@@ -274,15 +269,14 @@ end
 --   replaces: available_bits u      (valid because always used before get_symbol)
 --   replaces: output_pos g
 --
--- "i" is typically used for function arguments, sometimes "g":
+-- "i" is typically used for function arguments, sometimes "q":
 --   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
 --   replaces: byte i           (first argument of write_byte)
---   replaces: distance i       (first arg of readback_byte)
 --   replaces: huff_tree i      (first arg of get_symbol)
 --   replaces: tree_desc i      (first arg of build_huff_tree)
 --   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
 --   replaces: len_tree_desc q
---   replaces: lit_tree g       (first arg of do_block, no conflict with output_pos)
+--   replaces: lit_tree o       (first arg of do_block)
 --   replaces: len_tree i       (second arg of do_block)
 --
 -- this is not a local variable but a table member, however
@@ -296,7 +290,7 @@ end
 --
 -- not cleaned yet:
 --   replaces: read_tree r get_int q
---   replaces: dist d size r
+--   replaces: distance q size r
 --   replaces: code o c1 m
 --
 -- free: l z
