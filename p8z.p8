@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
-function inflate(s, p, l)
+function inflate(data_string, data_address, data_length)
   -- init stream reader
   local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local bit_buffer = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
@@ -47,25 +47,25 @@ function inflate(s, p, l)
       -- unpack the next 8 characters of base59 data into 47 bits of
       -- information that we insert into bit_buffer in chunks of 16 or
       -- 15 bits.
-      if l and l > 0 then
-        bit_buffer += shr(peek(p), 16 - available_bits)
+      if data_length and data_length > 0 then
+        bit_buffer += shr(peek(data_address), 16 - available_bits)
         available_bits += 8
-        p += 1
-        l -= 1
+        data_address += 1
+        data_length -= 1
       elseif state == 0 then
         local e = 2^-16
-        local p = 0 temp_buffer = 0
+        local data_address = 0 temp_buffer = 0
         for i = 1, 8 do
-          local c = char_lut[sub(s, i, i)] or 0
+          local c = char_lut[sub(data_string, i, i)] or 0
           temp_buffer += e % 1 * c
-          p += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
+          data_address += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
           e *= 59
         end
-        s = sub(s, 9)
+        data_string = sub(data_string, 9)
         bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 16
         state += 1
-        temp_buffer = p + shr(temp_buffer, 16)
+        temp_buffer = data_address + shr(temp_buffer, 16)
       elseif state == 1 then
         bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 16
@@ -245,6 +245,8 @@ function inflate(s, p, l)
 end
 
 -- strategy for minifying (renaming variables):
+--
+--   replaces: data_string s data_address p data_length l
 --
 -- rename functions, in order of appearance:
 --   replaces: flush_bits f
