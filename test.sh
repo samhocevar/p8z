@@ -18,7 +18,7 @@ minify() {
 #  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
     | tr A-Z a-z \
-    | sed 's/_ ", i,/Z/' \
+    | sed 's/_ ", i, i/Z/' \
     | grep -v -- '-- *debug' | sed 's/--.*//' | grep . \
     | sed "$(sed -ne 's/.*-- *replaces: //p' "$1" | sed -e 's/([^)]*)//g' \
               | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
@@ -28,7 +28,7 @@ minify() {
     | sed 's/\([1-9]\) \([g-z]\)/\1\2/g' \
     | sed 's/ *X[ X]*/ /g' \
     | sed 's/ *\([][<>(){}-+*%^\/=:!~,-]\) */\1/g' \
-    | sed 's/Z/_ ",i,/'
+    | sed 's/Z/_ ",i,i/'
 }
 
 # Inspect p8z.p8 for stats
