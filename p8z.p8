@@ -208,7 +208,6 @@ function inflate(s, p, l)
     local z = build_huff_tree(tree_desc)
     local lit_tree_desc = {}
     local len_tree_desc = {}
-    local c = 0
     while #lit_tree_desc + #len_tree_desc < lit_count + len_count do
       local v = getv(z)
       if v >= 19 then                                                        -- debug
@@ -217,10 +216,10 @@ function inflate(s, p, l)
       -- it is legal to precompute z here because the trees are read separately
       -- (see send_all_trees() in zlib/trees.c)
       local z = #lit_tree_desc < lit_count and lit_tree_desc or len_tree_desc
-      if v < 16  then c = v add(z, c) end
-      if v == 16 then       for j = -2, get_bits(2)     do add(z, c) end end
-      if v == 17 then c = 0 for j = -2, get_bits(3)     do add(z, c) end end
-      if v == 18 then c = 0 for j = -2, get_bits(7) + 8 do add(z, c) end end
+          if v == 16 then for j = -2, get_bits(2)     do add(z, z[#z]) end
+      elseif v == 17 then for j = -2, get_bits(3)     do add(z, 0) end
+      elseif v == 18 then for j = -2, get_bits(7) + 8 do add(z, 0) end
+      else add(z, v) end
     end
     do_block(build_huff_tree(lit_tree_desc),
              build_huff_tree(len_tree_desc))
