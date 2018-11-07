@@ -196,7 +196,7 @@ function inflate(s, p, l)
 
   -- inflate dynamic block
   methods[2] = function()
-    -- replaces: lit_count l len_count y desc_len k
+    -- replaces: lit_count l len_count y count l desc_len k
     local tree_desc = {}
     local lit_count = 257 + get_bits(5)
     local len_count = 1 + get_bits(5)
@@ -206,23 +206,23 @@ function inflate(s, p, l)
       tree_desc[(j + 15) % 19 + 1] = j > desc_len and 0 or get_bits(3)
     end
     local z = build_huff_tree(tree_desc)
-    local lit_tree_desc = {}
-    local len_tree_desc = {}
-    while #lit_tree_desc + #len_tree_desc < lit_count + len_count do
-      local v = getv(z)
-      if v >= 19 then                                                        -- debug
-        error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
-      end                                                                    -- debug
-      -- it is legal to precompute z here because the trees are read separately
-      -- (see send_all_trees() in zlib/trees.c)
-      local z = #lit_tree_desc < lit_count and lit_tree_desc or len_tree_desc
-          if v == 16 then for j = -2, get_bits(2)     do add(z, z[#z]) end
-      elseif v == 17 then for j = -2, get_bits(3)     do add(z, 0) end
-      elseif v == 18 then for j = -2, get_bits(7) + 8 do add(z, 0) end
-      else add(z, v) end
+
+    local function read_tree(count)
+      local tree_desc = {}
+      while #tree_desc < count do
+        local v = getv(z)
+        if v >= 19 then                                                        -- debug
+          error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
+        end                                                                    -- debug
+            if v == 16 then for j = -2, get_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
+        elseif v == 17 then for j = -2, get_bits(3)     do add(tree_desc, 0) end
+        elseif v == 18 then for j = -2, get_bits(7) + 8 do add(tree_desc, 0) end
+        else add(tree_desc, v) end
+      end
+      return build_huff_tree(tree_desc)
     end
-    do_block(build_huff_tree(lit_tree_desc),
-             build_huff_tree(len_tree_desc))
+
+    do_block(read_tree(lit_count), read_tree(len_count))
   end
 
   -- inflate static block
@@ -307,6 +307,7 @@ end
 --   replaces: output_buffer j
 --
 -- not cleaned yet:
+--   replaces: read_tree r
 --   replaces: dist d size r
 --   replaces: code o c1 m
 --
