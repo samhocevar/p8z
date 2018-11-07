@@ -2,58 +2,6 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
--- strategy for minifying (renaming variables):
---
--- rename functions, in order of appearance:
---   replaces: flush_bits f
---   replaces: peek_bits h
---   replaces: get_bits x
---   replaces: getv u
---   replaces: write_byte w
---   replaces: readback_byte a    (todo)
---   replaces: build_huff_tree h  (no conflict with peek_bits)
---   replaces: do_block b         (todo)
---
--- rename local variables in functions to the same name
--- as their containing functions:
---   replaces: tree h (in build_huff_tree)
--- or not:
---   replaces: symbol l len_code l  (local variables in do_block)
---
--- first, we rename some internal variables:
---   replaces: char_lut y methods y  (no conflict)
---   replaces: state x               (valid because always used before get_bits)
---   replaces: bit_buffer w          (valid because always used before write_byte)
---   replaces: temp_buffer v
---   replaces: available_bits u      (valid because always used before getv)
---   replaces: output_pos g
---
--- "i" is typically used for function arguments, sometimes "g":
---   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
---   replaces: byte i           (first argument of write_byte)
---   replaces: distance i       (first arg of readback_byte)
---   replaces: huff_tree i      (first arg of getv)
---   replaces: tree_desc i      (first arg of build_huff_tree)
---   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
---   replaces: len_tree_desc q
---   replaces: lit_tree g       (first arg of do_block, no conflict with output_pos)
---   replaces: len_tree i       (second arg of do_block)
---
--- this is not a local variable but a table member, however
--- the string "i=1" appears just after it is initialised, so
--- we can save one byte by calling it "i" too:
---   replaces: max_bits i
---
--- we can also rename this because "j" is only used as
--- a local variable in functions that do not use output_buffer:
---   replaces: output_buffer j
---
--- not cleaned yet:
---   replaces: dist d size r
---   replaces: code o c1 m
---
--- free: l z
-
 function inflate(s, p, l)
   -- init stream reader
   local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
@@ -312,4 +260,56 @@ function inflate(s, p, l)
 
   return output_buffer
 end
+
+-- strategy for minifying (renaming variables):
+--
+-- rename functions, in order of appearance:
+--   replaces: flush_bits f
+--   replaces: peek_bits h
+--   replaces: get_bits x
+--   replaces: getv u
+--   replaces: write_byte w
+--   replaces: readback_byte a    (todo)
+--   replaces: build_huff_tree h  (no conflict with peek_bits)
+--   replaces: do_block b         (todo)
+--
+-- rename local variables in functions to the same name
+-- as their containing functions:
+--   replaces: tree h (in build_huff_tree)
+-- or not:
+--   replaces: symbol l len_code l  (local variables in do_block)
+--
+-- first, we rename some internal variables:
+--   replaces: char_lut y methods y  (no conflict)
+--   replaces: state x               (valid because always used before get_bits)
+--   replaces: bit_buffer w          (valid because always used before write_byte)
+--   replaces: temp_buffer v
+--   replaces: available_bits u      (valid because always used before getv)
+--   replaces: output_pos g
+--
+-- "i" is typically used for function arguments, sometimes "g":
+--   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
+--   replaces: byte i           (first argument of write_byte)
+--   replaces: distance i       (first arg of readback_byte)
+--   replaces: huff_tree i      (first arg of getv)
+--   replaces: tree_desc i      (first arg of build_huff_tree)
+--   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
+--   replaces: len_tree_desc q
+--   replaces: lit_tree g       (first arg of do_block, no conflict with output_pos)
+--   replaces: len_tree i       (second arg of do_block)
+--
+-- this is not a local variable but a table member, however
+-- the string "i=1" appears just after it is initialised, so
+-- we can save one byte by calling it "i" too:
+--   replaces: max_bits i
+--
+-- we can also rename this because "j" is only used as
+-- a local variable in functions that do not use output_buffer:
+--   replaces: output_buffer j
+--
+-- not cleaned yet:
+--   replaces: dist d size r
+--   replaces: code o c1 m
+--
+-- free: l z
 
