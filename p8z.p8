@@ -94,7 +94,7 @@ function inflate(s, p, l)
   end
 
   -- get next variable value from stream, according to huffman table
-  local function getv(huff_tree)
+  local function get_symbol(huff_tree)
     -- require at least n bits, even if only p<n bytes may be actually consumed
     local j = peek_bits(huff_tree.max_bits)
     flush_bits(huff_tree[j] % 1 * 16)
@@ -158,37 +158,27 @@ function inflate(s, p, l)
 
   -- decompress a block using the two huffman tables
   local function do_block(lit_tree, len_tree)
-    local symbol = getv(lit_tree)
+
+    local function get_int(symbol, n)
+      if symbol > n then
+        local i = flr(symbol / n - 1)
+        symbol = shl(symbol % n + n, i) + get_bits(i)
+      end
+      return symbol
+    end
+
+    local symbol = get_symbol(lit_tree)
     while symbol != 256 do
       if symbol < 256 then
         write_byte(symbol)
       else
-        symbol -= 257
-        local n = 0
-        local size = 3
-        local dist = 1
-        if symbol < 8 then
-          size += symbol
-        elseif symbol < 28 then
-          n = flr(symbol / 4 - 1)
-          size += shl(symbol % 4 + 4, n)
-          size += get_bits(n)
-        else
-          size += 255
-        end
-        local len_code = getv(len_tree)
-        if len_code < 4 then
-          dist += len_code
-        else
-          n = flr(len_code / 2 - 1)
-          dist += shl(len_code % 2 + 2, n)
-          dist += get_bits(n)
-        end
-        for i = 1, size do
+        local size = symbol < 285 and get_int(symbol - 257, 4) or 255
+        local dist = 1 + get_int(get_symbol(len_tree), 2)
+        for i = -2, size do
           write_byte(readback_byte(dist))
         end
       end
-      symbol = getv(lit_tree)
+      symbol = get_symbol(lit_tree)
     end
   end
 
@@ -208,7 +198,7 @@ function inflate(s, p, l)
     local function read_tree(count)
       local tree_desc = {}
       while #tree_desc < count do
-        local v = getv(z)
+        local v = get_symbol(z)
         if v >= 19 then                                                        -- debug
           error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
         end                                                                    -- debug
@@ -264,7 +254,7 @@ end
 --   replaces: flush_bits f
 --   replaces: peek_bits h
 --   replaces: get_bits x
---   replaces: getv u
+--   replaces: get_symbol u
 --   replaces: write_byte w
 --   replaces: readback_byte a    (todo)
 --   replaces: build_huff_tree h  (no conflict with peek_bits)
@@ -281,14 +271,14 @@ end
 --   replaces: state x               (valid because always used before get_bits)
 --   replaces: bit_buffer w          (valid because always used before write_byte)
 --   replaces: temp_buffer v
---   replaces: available_bits u      (valid because always used before getv)
+--   replaces: available_bits u      (valid because always used before get_symbol)
 --   replaces: output_pos g
 --
 -- "i" is typically used for function arguments, sometimes "g":
 --   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
 --   replaces: byte i           (first argument of write_byte)
 --   replaces: distance i       (first arg of readback_byte)
---   replaces: huff_tree i      (first arg of getv)
+--   replaces: huff_tree i      (first arg of get_symbol)
 --   replaces: tree_desc i      (first arg of build_huff_tree)
 --   replaces: lit_tree_desc i  (only appears after tree_desc is no longer used)
 --   replaces: len_tree_desc q
@@ -305,7 +295,7 @@ end
 --   replaces: output_buffer j
 --
 -- not cleaned yet:
---   replaces: read_tree r
+--   replaces: read_tree r get_int q
 --   replaces: dist d size r
 --   replaces: code o c1 m
 --
