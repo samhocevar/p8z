@@ -170,8 +170,8 @@ function inflate(data_string, data_address, data_length)
         for i = -2, size do
           -- read back one byte and append it to the output
           local d = (output_pos - distance / 4) % 1
-          i = flr(output_pos - distance / 4)
-          write_byte(band(output_buffer[i] / 256 ^ (4 * d - 2), 255))
+          local p = flr(output_pos - distance / 4)
+          write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
         end
       end
       symbol = get_symbol(lit_tree)
