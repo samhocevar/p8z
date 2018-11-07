@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
         input.push_back(ch);
 
     // Prepare a vector twice as big... we don't really care.
-    std::vector<uint8_t> output(input.size() * 2);
+    std::vector<uint8_t> output(input.size() * 2 + 10);
 
     z_stream zs = {};
     zs.zalloc = [](void *, unsigned int n, unsigned int m) -> void * { return new char[n * m]; };
