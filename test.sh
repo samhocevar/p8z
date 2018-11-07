@@ -18,7 +18,7 @@ minify() {
 #  cat "$1" | tail -n +4; return
   cat "$1" | tail -n +4 \
     | tr A-Z a-z \
-    | sed 's/_ ",i,/Z/' \
+    | sed 's/_ ", i,/Z/' \
     | grep -v -- '-- *debug' | sed 's/--.*//' | grep . \
     | sed "$(sed -ne 's/.*-- *replaces: //p' "$1" | sed -e 's/([^)]*)//g' \
               | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
@@ -40,24 +40,7 @@ $TOOL "$TMPFILE"
 echo ""
 
 # Check that the code works
-test_string() {
-  STR="$1"
-  echo "# Compressing string: '$STR'"
-
-  echo "### hexdump"
-  printf %s "$STR" | od -v -An -x --endian=little | xargs -n2 | awk '{ print "0x"$2"."$1 }'
-
-  echo "### PICO-8"
-  minify p8z.p8 > "$TMPFILE"
-  echo 'c=' >> "$TMPFILE"
-  printf %s "$STR" | ./p8z >> "$TMPFILE"
-  echo 't=inflate(c) x=0 for i=1,#t do x+=t[i] end printh("Uncompressed "..(4*#t).." Checksum "..tostr(x, true))' >> "$TMPFILE"
-  out="$($TOOL "$TMPFILE")"
-  case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
-}
-
-test_file() {
-  echo "# Compressing files: $*"
+test_common() {
   minify p8z.p8 > "$TMPFILE.tmp"
   echo 'c=' >> "$TMPFILE.tmp"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
@@ -69,7 +52,22 @@ test_file() {
   case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
 
-test_string "to be or not to be"
+test_string() {
+  STR="$1"
+  echo "# Compressing string: '$STR'"
+  printf '%s' "$STR" >| "$TMPFILE"
+  test_common "$TMPFILE"
+}
+
+test_file() {
+  echo "# Compressing files: $*"
+  test_common "$@"
+}
+
+test_string ""
+test_string "ABCD"
+test_string "11112222333344445555"
+test_string "21112222333344445555211122223333444455552111222233334444555511112222333344445555"
 test_string "to be or not to be or to be or maybe not to be or maybe finally to be..."
 test_string "98398743287509834098332165732043059430973981643159327439827439217594327643982715432543"
 
