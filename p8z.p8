@@ -197,14 +197,12 @@ function inflate(s, p, l)
   -- inflate dynamic block
   methods[2] = function()
     -- replaces: lit_count l len_count y count l desc_len k
-    local tree_desc = {}
     local lit_count = 257 + get_bits(5)
     local len_count = 1 + get_bits(5)
-    local desc_len = 4 + get_bits(4)
-    for j = 1, 19 do
-      -- the formula below differs from the original deflate
-      tree_desc[(j + 15) % 19 + 1] = j > desc_len and 0 or get_bits(3)
-    end
+    -- fixme: maybe this can be removed when build_huff_tree accepts sparse tables
+    local tree_desc = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+    -- the formula below differs from the original deflate
+    for j = -3, get_bits(4) do tree_desc[j % 19 + 1] = get_bits(3) end
     local z = build_huff_tree(tree_desc)
 
     local function read_tree(count)
