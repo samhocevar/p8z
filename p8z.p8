@@ -123,12 +123,12 @@ function inflate(data_string, data_address, data_length)
       local l = tree_desc[j]
       if l > 0 then
         -- flip the first l bits of c[l]
-        local code = 0
-        for j = 1, l do code += shl(band(shr(c[l], j - 1), 1), l - j) end
+        local reversed_code = 0
+        for j = 1, l do reversed_code += shl(band(shr(c[l], j - 1), 1), l - j) end
         -- store all possible n-bit values that end with flip(c[l])
-        while code < 2 ^ tree.max_bits do
-          tree[code] = j - 1 + l / 16
-          code += 2 ^ l
+        while reversed_code < 2 ^ tree.max_bits do
+          tree[reversed_code] = j - 1 + l / 16
+          reversed_code += 2 ^ l
         end
         -- point to next code of length l
         c[l] += 1
@@ -147,37 +147,6 @@ function inflate(data_string, data_address, data_length)
     local p = flr(output_pos)
     output_buffer[p] = byte * 256 ^ (4 * d - 2) + (output_buffer[p] or 0)
     output_pos += 1 / 4
-  end
-
-  --
-  -- decompress a block using the two huffman tables
-  --
-  local function do_block(lit_tree, len_tree)
-
-    local function get_int(symbol, n)
-      if symbol > n then
-        local i = flr(symbol / n - 1)
-        symbol = shl(symbol % n + n, i) + get_bits(i)
-      end
-      return symbol
-    end
-
-    local symbol = get_symbol(lit_tree)
-    while symbol != 256 do
-      if symbol < 256 then
-        write_byte(symbol)
-      else
-        local size = symbol < 285 and get_int(symbol - 257, 4) or 255
-        local distance = 1 + get_int(get_symbol(len_tree), 2)
-        for i = -2, size do
-          -- read back one byte and append it to the output
-          local d = (output_pos - distance / 4) % 1
-          local p = flr(output_pos - distance / 4)
-          write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
-        end
-      end
-      symbol = get_symbol(lit_tree)
-    end
   end
 
   --
@@ -213,7 +182,9 @@ function inflate(data_string, data_address, data_length)
         local len_count = 1 + get_bits(5)
         -- fixme: maybe this can be removed when build_huff_tree accepts sparse tables
         local tree_desc = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
-        -- the formula below differs from the original deflate
+        -- the formula below differs from official deflate
+        --  deflate: {17,18,19,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
+        --  j%19+1:  {17,18,19,1,9,8,10,7,11,6,12,5,13,4,14,3,15,2,16}
         for j = -3, get_bits(4) do tree_desc[j % 19 + 1] = get_bits(3) end
         local z = build_huff_tree(tree_desc)
 
@@ -234,8 +205,34 @@ function inflate(data_string, data_address, data_length)
         read_tree(len_tree_desc, len_count)
       end
 
-      do_block(build_huff_tree(lit_tree_desc),
-               build_huff_tree(len_tree_desc))
+      lit_tree_desc = build_huff_tree(lit_tree_desc)
+      len_tree_desc = build_huff_tree(len_tree_desc)
+
+      local function get_int(symbol, n)
+        if symbol > n then
+          local i = flr(symbol / n - 1)
+          symbol = shl(symbol % n + n, i) + get_bits(i)
+        end
+        return symbol
+      end
+
+      -- decompress the block using the two huffman tables
+      local symbol = get_symbol(lit_tree_desc)
+      while symbol != 256 do
+        if symbol < 256 then
+          write_byte(symbol)
+        else
+          local size = symbol < 285 and get_int(symbol - 257, 4) or 255
+          local distance = 1 + get_int(get_symbol(len_tree_desc), 2)
+          for i = -2, size do
+            -- read back one byte and append it to the output
+            local d = (output_pos - distance / 4) % 1
+            local p = flr(output_pos - distance / 4)
+            write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
+          end
+        end
+        symbol = get_symbol(lit_tree_desc)
+      end
     end
   end
 
@@ -252,8 +249,8 @@ end
 --   replaces: get_bits x
 --   replaces: get_symbol u
 --   replaces: write_byte w
---   replaces: build_huff_tree h  (no conflict with peek_bits)
---   replaces: do_block b         (todo)
+--   replaces: build_huff_tree h  (no conflict with get_int)
+--   replaces: get_int h
 --
 -- rename local variables in functions to the same name
 -- as their containing functions:
@@ -290,9 +287,9 @@ end
 --   replaces: output_buffer j
 --
 -- not cleaned yet:
---   replaces: read_tree r get_int q
+--   replaces: read_tree r
 --   replaces: distance q size r
---   replaces: code o c1 m
+--   replaces: reversed_code o
 --
 -- free: l z
 
