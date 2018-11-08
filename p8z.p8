@@ -52,7 +52,7 @@ function inflate(data_string, data_address, data_length)
         available_bits += 8
         data_address += 1
         data_length -= 1
-      elseif state == 0 then
+      elseif state < 1 then
         local e = 2^-16
         local p = 0 temp_buffer = 0
         for i = 1, 8 do
@@ -66,7 +66,7 @@ function inflate(data_string, data_address, data_length)
         available_bits += 16
         state += 1
         temp_buffer = lshr(temp_buffer, 16) + p
-      elseif state == 1 then
+      elseif state < 2 then
         bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 16
         state += 1
