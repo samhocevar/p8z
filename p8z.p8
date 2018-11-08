@@ -54,24 +54,25 @@ function inflate(data_string, data_address, data_length)
         data_length -= 1
       elseif state == 0 then
         local e = 2^-16
-        local data_address = 0 temp_buffer = 0
+        local p = 0 temp_buffer = 0
         for i = 1, 8 do
           local c = char_lut[sub(data_string, i, i)] or 0
           temp_buffer += e % 1 * c
-          data_address += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
+          p += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
           e *= 59
         end
         data_string = sub(data_string, 9)
         bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 16
         state += 1
-        temp_buffer = data_address + shr(temp_buffer, 16)
+        temp_buffer = lshr(temp_buffer, 16) + p
       elseif state == 1 then
         bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 16
         state += 1
+        temp_buffer = lshr(temp_buffer, 16)
       else
-        bit_buffer += lshr(temp_buffer, 16) * 2 ^ available_bits
+        bit_buffer += temp_buffer % 1 * 2 ^ available_bits
         available_bits += 15
         state = 0
       end
