@@ -100,39 +100,25 @@ function inflate(data_string, data_address, data_length)
   -- build a huffman table
   local function build_huff_tree(tree_desc)
     local tree = { max_bits = 1 }
-    -- fill c with the bit length counts
-    local c = {}
-    for j = 1, 17 do
-      c[j] = 0
+    for j = 1, 288 do
+      tree.max_bits = max(tree.max_bits, tree_desc[j] or 0)
     end
-    for j = 1, #tree_desc do
-      -- fixme: get rid of the local?
-      local n = tree_desc[j]
-      tree.max_bits = max(tree.max_bits, n)
-      c[n+1] += 2 -- premultiply by 2
-    end
-    -- replace the contents of c with the next code lengths
-    c[1] = 0
-    for j = 2, tree.max_bits do
-      c[j] += c[j-1]
-      c[j] += c[j-1]
-    end
-    -- fill tree with the possible codes, pre-flipped so that we do not
-    -- have to reverse every chunk we read.
-    for j = 1, #tree_desc do
-      local l = tree_desc[j]
-      if l > 0 then
-        -- flip the first l bits of c[l]
-        local reversed_code = 0
-        for j = 1, l do reversed_code += shl(band(shr(c[l], j - 1), 1), l - j) end
-        -- store all possible n-bit values that end with flip(c[l])
-        while reversed_code < 2 ^ tree.max_bits do
-          tree[reversed_code] = j - 1 + l / 16
-          reversed_code += 2 ^ l
+    local code = 0
+    for l = 1, 18 do -- for some reason "18" compresses better than "17" or even "16"!
+      for j = 1, 288 do
+        if tree_desc[j] == l then
+          -- flip the first l bits of the current code
+          local reversed_code = 0
+          for j = 1, l do reversed_code += shl(band(shr(code, j - 1), 1), l - j) end
+          -- store all possible n-bit values that end with flip(code)
+          while reversed_code < 2 ^ tree.max_bits do
+            tree[reversed_code] = j - 1 + l / 16
+            reversed_code += 2 ^ l
+          end
+          code += 1
         end
-        -- point to next code of length l
-        c[l] += 1
       end
+      code += code
     end
     return tree
   end
@@ -220,12 +206,13 @@ function inflate(data_string, data_address, data_length)
       local symbol = get_symbol(lit_tree_desc)
       while symbol != 256 do
         if symbol < 256 then
+          -- write a literal symbol to the output
           write_byte(symbol)
         else
           local size = symbol < 285 and get_int(symbol - 257, 4) or 255
           local distance = 1 + get_int(get_symbol(len_tree_desc), 2)
+          -- read back size+3 bytes and append them to the output
           for i = -2, size do
-            -- read back one byte and append it to the output
             local d = (output_pos - distance / 4) % 1
             local p = flr(output_pos - distance / 4)
             write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
@@ -289,7 +276,7 @@ end
 -- not cleaned yet:
 --   replaces: read_tree r
 --   replaces: distance q size r
---   replaces: reversed_code o
+--   replaces: code c reversed_code o
 --
 -- free: l z
 
