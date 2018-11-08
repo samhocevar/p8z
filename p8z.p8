@@ -79,18 +79,18 @@ function inflate(data_string, data_address, data_length)
     --printh("peek_bits("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits))
     --       .." [bit_buffer = "..strx(shl(bit_buffer, 16)).."]")
     return lshr(shl(bit_buffer, 32 - nbits), 16 - nbits)
-    -- this cannot work because of get_bits(16)
+    -- this cannot work because of read_bits(16)
     -- maybe bring this back if we disable uncompressed blocks?
     --return band(shl(bit_buffer, 16), 2 ^ nbits - 1)
   end
 
   -- get a number of n bits from stream and flush them
-  local function get_bits(nbits)
+  local function read_bits(nbits)
     return peek_bits(nbits), flush_bits(nbits)
   end
 
   -- get next variable value from stream, according to huffman table
-  local function get_symbol(huff_tree)
+  local function read_symbol(huff_tree)
     -- require at least n bits, even if only p<n bytes may be actually consumed
     local j = peek_bits(huff_tree.max_bits)
     flush_bits(huff_tree[j] % 1 * 16)
@@ -138,8 +138,8 @@ function inflate(data_string, data_address, data_length)
   --
   -- main loop
   --
-  while get_bits(1) > 0 do
-    local i = get_bits(2)
+  while read_bits(1) > 0 do
+    local i = read_bits(2)
     -- block type 3 does not exist
     if i == 3 then                    -- debug
       error("unsupported block type") -- debug
@@ -150,8 +150,8 @@ function inflate(data_string, data_address, data_length)
       -- is no concept of byte boundary in a stream we read in 47-bit chunks.
       -- also, we do not store the bit complement of the length value, it is
       -- not really important with such small data.
-      for i = 1, get_bits(16) do
-        write_byte(get_bits(8))
+      for i = 1, read_bits(16) do
+        write_byte(read_bits(8))
       end
     else
       -- replaces: lit_count l len_count y count j
@@ -164,25 +164,24 @@ function inflate(data_string, data_address, data_length)
         for j =   1,  32 do len_tree_desc[j] = 5 end
       else
         -- inflate dynamic block
-        local lit_count = 257 + get_bits(5)
-        local len_count = 1 + get_bits(5)
-        -- fixme: maybe this can be removed when build_huff_tree accepts sparse tables
-        local tree_desc = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+        local lit_count = 257 + read_bits(5)
+        local len_count = 1 + read_bits(5)
+        local tree_desc = {}
         -- the formula below differs from official deflate
         --  deflate: {17,18,19,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
         --  j%19+1:  {17,18,19,1,9,8,10,7,11,6,12,5,13,4,14,3,15,2,16}
-        for j = -3, get_bits(4) do tree_desc[j % 19 + 1] = get_bits(3) end
+        for j = -3, read_bits(4) do tree_desc[j % 19 + 1] = read_bits(3) end
         local z = build_huff_tree(tree_desc)
 
         local function read_tree(tree_desc, count)
           while #tree_desc < count do
-            local v = get_symbol(z)
+            local v = read_symbol(z)
             if v >= 19 then                                                        -- debug
               error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
             end                                                                    -- debug
-                if v == 16 then for j = -2, get_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
-            elseif v == 17 then for j = -2, get_bits(3)     do add(tree_desc, 0) end
-            elseif v == 18 then for j = -2, get_bits(7) + 8 do add(tree_desc, 0) end
+                if v == 16 then for j = -2, read_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
+            elseif v == 17 then for j = -2, read_bits(3)     do add(tree_desc, 0) end
+            elseif v == 18 then for j = -2, read_bits(7) + 8 do add(tree_desc, 0) end
             else add(tree_desc, v) end
           end
         end
@@ -194,23 +193,23 @@ function inflate(data_string, data_address, data_length)
       lit_tree_desc = build_huff_tree(lit_tree_desc)
       len_tree_desc = build_huff_tree(len_tree_desc)
 
-      local function get_int(symbol, n)
+      local function read_int(symbol, n)
         if symbol > n then
           local i = flr(symbol / n - 1)
-          symbol = shl(symbol % n + n, i) + get_bits(i)
+          symbol = shl(symbol % n + n, i) + read_bits(i)
         end
         return symbol
       end
 
       -- decompress the block using the two huffman tables
-      local symbol = get_symbol(lit_tree_desc)
+      local symbol = read_symbol(lit_tree_desc)
       while symbol != 256 do
         if symbol < 256 then
           -- write a literal symbol to the output
           write_byte(symbol)
         else
-          local size = symbol < 285 and get_int(symbol - 257, 4) or 255
-          local distance = 1 + get_int(get_symbol(len_tree_desc), 2)
+          local size = symbol < 285 and read_int(symbol - 257, 4) or 255
+          local distance = 1 + read_int(read_symbol(len_tree_desc), 2)
           -- read back size+3 bytes and append them to the output
           for i = -2, size do
             local d = (output_pos - distance / 4) % 1
@@ -218,7 +217,7 @@ function inflate(data_string, data_address, data_length)
             write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
           end
         end
-        symbol = get_symbol(lit_tree_desc)
+        symbol = read_symbol(lit_tree_desc)
       end
     end
   end
@@ -233,11 +232,11 @@ end
 -- rename functions, in order of appearance:
 --   replaces: flush_bits f
 --   replaces: peek_bits h
---   replaces: get_bits x
---   replaces: get_symbol u
+--   replaces: read_bits x
+--   replaces: read_symbol u
 --   replaces: write_byte w
---   replaces: build_huff_tree h  (no conflict with get_int)
---   replaces: get_int h
+--   replaces: build_huff_tree h  (no conflict with read_int)
+--   replaces: read_int h
 --
 -- rename local variables in functions to the same name
 -- as their containing functions:
@@ -247,16 +246,16 @@ end
 --
 -- first, we rename some internal variables:
 --   replaces: char_lut y
---   replaces: state x          (valid because always used before get_bits)
+--   replaces: state x          (valid because always used before read_bits)
 --   replaces: bit_buffer w     (valid because always used before write_byte)
 --   replaces: temp_buffer v
---   replaces: available_bits u (valid because always used before get_symbol)
+--   replaces: available_bits u (valid because always used before read_symbol)
 --   replaces: output_pos g
 --
 -- "i" is typically used for function arguments, sometimes "q":
---   replaces: nbits i          (first argument of get_bits/peek_bits/flush_bits)
+--   replaces: nbits i          (first argument of read_bits/peek_bits/flush_bits)
 --   replaces: byte i           (first argument of write_byte)
---   replaces: huff_tree i      (first arg of get_symbol)
+--   replaces: huff_tree i      (first arg of read_symbol)
 --   replaces: tree_desc i      (first arg of build_huff_tree)
 --   replaces: lit_tree o       (first arg of do_block)
 --   replaces: len_tree i       (second arg of do_block)
