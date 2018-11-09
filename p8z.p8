@@ -166,13 +166,11 @@ function inflate(data_string, data_address, data_length)
   --
   -- main loop
   --
-  while read_bits(1) > 0 do
-    local i = read_bits(2)
-    -- block type 3 does not exist
-    if i == 3 then                    -- debug
-      error("unsupported block type") -- debug
-    end                               -- debug
-    if i < 1 then
+  for j = 1, 288 do -- minifying trick; there's never going to be 288 blocks!
+    if read_bits(1) < 1 then
+      if read_bits(1) < 1 then
+        return output_buffer
+      end
       -- inflate uncompressed byte array
       -- we do not align the input buffer to a byte boundary, because there
       -- is no concept of byte boundary in a stream we read in 47-bit chunks.
@@ -186,7 +184,7 @@ function inflate(data_string, data_address, data_length)
       -- [minify] replaces: lit_count l len_count i tree_desc t
       local lit_tree_desc = {}
       local len_tree_desc = {}
-      if i < 2 then
+      if read_bits(1) < 1 then
         -- inflate static block
         for j =   1, 288 do lit_tree_desc[j] = 8 end
         for j = 145, 280 do lit_tree_desc[j] += sgn(256 - j) end
@@ -253,7 +251,5 @@ function inflate(data_string, data_address, data_length)
       end
     end
   end
-
-  return output_buffer
 end
 

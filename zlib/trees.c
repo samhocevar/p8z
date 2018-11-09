@@ -871,8 +871,8 @@ void ZLIB_INTERNAL _tr_stored_block(s, buf, stored_len, last)
     int last;         /* one if this is the last block for a file */
 {
 #if P8Z
-    (void)last;
-    send_bits(s, (STORED_BLOCK<<1)+1, 3);    /* send block type */
+    (void) last;
+    send_bits(s, 2, 2); /* send block header */
     send_bits(s, (ush)stored_len, 16);
     for (ulg i = 0; i < stored_len; ++i)
         send_bits(s, buf[i], 8);
@@ -988,7 +988,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
     } else if (s->strategy == Z_FIXED || static_lenb == opt_lenb) {
 #endif
 #ifdef P8Z
-        send_bits(s, (STATIC_TREES<<1)+1, 3);
+        send_bits(s, 1, 2); /* send block header */
 #else
         send_bits(s, (STATIC_TREES<<1)+last, 3);
 #endif
@@ -999,7 +999,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
 #endif
     } else {
 #ifdef P8Z
-        send_bits(s, (DYN_TREES<<1)+1, 3);
+        send_bits(s, 3, 2); /* send block header */
 #else
         send_bits(s, (DYN_TREES<<1)+last, 3);
 #endif
@@ -1019,7 +1019,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
 
     if (last) {
 #ifdef P8Z
-        send_bits(s, 0, 1);
+        send_bits(s, 0, 2); /* send block header */
 #endif
         bi_windup(s);
 #ifdef ZLIB_DEBUG
