@@ -20,7 +20,7 @@ minify() {
     | tr A-Z a-z \
     | sed 's/_ ", i, i/Z/' \
     | grep -v -- '-- *debug' | sed 's/--.*//' | grep . \
-    | sed "$(sed -ne 's/.*-- *replaces: //p' "$1" | sed -e 's/([^)]*)//g' \
+    | sed "$(sed -ne 's/.*--.*replaces: //p' "$1" | sed -e 's/([^)]*)//g' \
               | xargs -n 2 printf 's/\<%s\>/%s/g;')" \
     | sed 's/.*[-+*/%]=.*/X&X/' \
     | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ *$//' | awk '{ print $0 }' \

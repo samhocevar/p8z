@@ -2,12 +2,36 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
+--
+-- debug function to display hex numbers with minimal chars
+--
+local function strx(nbits)                                  -- debug
+  local s = sub(tostr(nbits, 1), 3, 6)                      -- debug
+  while #s > 1 and sub(s, 1, 1) == "0" do s = sub(s, 2) end -- debug
+  return "0x"..s                                            -- debug
+end                                                         -- debug
+
+--
+-- error reporting
+--
+local function error(s) -- debug
+  printh(s)             -- debug
+  abort()               -- debug
+end                     -- debug
+
+--
+-- main entry point for inflate()
+--
 function inflate(data_string, data_address, data_length)
+  -- [minify] replaces: state x bit_buffer w temp_buffer v available_bits u
+
   -- init stream reader
   local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local bit_buffer = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
   local available_bits = 0  -- number of bits in buffer
   local temp_buffer = 0     -- temp chunk buffer
+
+  -- [minify] replaces: flush_bits f char_lut y peek_bits h
 
   -- get rid of n first bits
   local function flush_bits(nbits)
@@ -15,20 +39,7 @@ function inflate(data_string, data_address, data_length)
     bit_buffer = lshr(bit_buffer, nbits)
   end
 
-  -- debug function to display hex numbers with minimal chars
-  local function strx(nbits)                                  -- debug
-    local s = sub(tostr(nbits, 1), 3, 6)                      -- debug
-    while #s > 1 and sub(s, 1, 1) == "0" do s = sub(s, 2) end -- debug
-    return "0x"..s                                            -- debug
-  end                                                         -- debug
-
-  -- handle error reporting
-  local function error(s) -- debug
-    printh(s)             -- debug
-    abort()               -- debug
-  end                     -- debug
-
-  -- init lookup table for peek_bits()
+  -- lookup table for peek_bits()
   --  - indices 1 and 2 are the higher bits (>=32) of 59^7 and 59^8
   --    used to compute these powers
   --  - string indices are for char -> byte lookups; the order in the
@@ -85,6 +96,9 @@ function inflate(data_string, data_address, data_length)
     --return band(shl(bit_buffer, 16), 2 ^ nbits - 1)
   end
 
+  -- [minify] can reuse: state x bit_buffer w temp_buffer v available_bits u
+  -- [minify] replaces: read_bits x read_symbol w
+
   -- get a number of n bits from stream and flush them
   local function read_bits(nbits)
     return peek_bits(nbits), flush_bits(nbits)
@@ -97,6 +111,9 @@ function inflate(data_string, data_address, data_length)
     flush_bits(huff_tree[j] % 1 * 16)
     return flr(huff_tree[j])
   end
+
+  -- [minify] can reuse: flush_bits f
+  -- [minify] replaces: build_huff_tree f
 
   -- build a huffman table
   local function build_huff_tree(tree_desc)
@@ -123,6 +140,8 @@ function inflate(data_string, data_address, data_length)
     end
     return tree
   end
+
+  -- [minify] replaces: output_buffer j output_pos v write_byte u
 
   -- init stream writer
   local output_buffer = {} -- output array (32-bit numbers)
@@ -172,18 +191,18 @@ function inflate(data_string, data_address, data_length)
         --  deflate: {17,18,19,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
         --  j%19+1:  {17,18,19,1,9,8,10,7,11,6,12,5,13,4,14,3,15,2,16}
         for j = -3, read_bits(4) do tree_desc[j % 19 + 1] = read_bits(3) end
-        local z = build_huff_tree(tree_desc)
+        local g = build_huff_tree(tree_desc)
 
         local function read_tree(tree_desc, count)
           while #tree_desc < count do
-            local v = read_symbol(z)
-            if v >= 19 then                                                        -- debug
-              error("wrong entry in depth table for literal/length alphabet: "..v) -- debug
+            local g = read_symbol(g)
+            if g >= 19 then                                                        -- debug
+              error("wrong entry in depth table for literal/length alphabet: "..g) -- debug
             end                                                                    -- debug
-                if v == 16 then for j = -2, read_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
-            elseif v == 17 then for j = -2, read_bits(3)     do add(tree_desc, 0) end
-            elseif v == 18 then for j = -2, read_bits(7) + 8 do add(tree_desc, 0) end
-            else add(tree_desc, v) end
+                if g == 16 then for j = -2, read_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
+            elseif g == 17 then for j = -2, read_bits(3)     do add(tree_desc, 0) end
+            elseif g == 18 then for j = -2, read_bits(7) + 8 do add(tree_desc, 0) end
+            else add(tree_desc, g) end
           end
         end
 
@@ -226,17 +245,13 @@ function inflate(data_string, data_address, data_length)
   return output_buffer
 end
 
+-- free: g
+--
 -- strategy for minifying (renaming variables):
 --
 --   replaces: data_string s data_address p data_length l
 --
 -- rename functions, in order of appearance:
---   replaces: flush_bits f
---   replaces: peek_bits h
---   replaces: read_bits x
---   replaces: read_symbol u
---   replaces: write_byte w
---   replaces: build_huff_tree h  (no conflict with read_int)
 --   replaces: read_int h
 --
 -- rename local variables in functions to the same name
@@ -244,14 +259,6 @@ end
 --   replaces: tree h (in build_huff_tree)
 -- or not:
 --   replaces: symbol l len_code l  (local variables in do_block)
---
--- first, we rename some internal variables:
---   replaces: char_lut y
---   replaces: state x          (valid because always used before read_bits)
---   replaces: bit_buffer w     (valid because always used before write_byte)
---   replaces: temp_buffer v
---   replaces: available_bits u (valid because always used before read_symbol)
---   replaces: output_pos g
 --
 -- "i" is typically used for function arguments, sometimes "q":
 --   replaces: nbits i          (first argument of read_bits/peek_bits/flush_bits)
@@ -278,5 +285,5 @@ end
 --   replaces: distance q size r
 --   replaces: code c reversed_code o
 --
--- free: l z
+-- free: a b c d e f g h i j k l m m n o p q r s t u v w x y z
 
