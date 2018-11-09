@@ -222,10 +222,10 @@ function inflate(data_string, data_address, data_length)
       len_tree_desc = build_huff_tree(len_tree_desc)
 
       -- [minify] replaces: read_varint g sym_code i
-      local function read_varint(sym_code, k)
-        if sym_code > k then
-          local j = flr(sym_code / k - 1)
-          sym_code = shl(sym_code % k + k, j) + read_bits(j)
+      local function read_varint(sym_code, j)
+        if sym_code > j then
+          local k = flr(sym_code / j - 1)
+          sym_code = shl(sym_code % j + j, k) + read_bits(k)
         end
         return sym_code
       end
