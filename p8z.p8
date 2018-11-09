@@ -23,8 +23,8 @@ end                     -- debug
 -- main entry point for inflate()
 --
 function inflate(data_string, data_address, data_length)
-  -- [minify] replaces: data_string z data_address y data_length x
-  -- [minify] replaces: bit_buffer w temp_buffer v available_bits u state t
+  -- [minify] replaces: data_string s char_lut t
+  -- [minify] replaces: data_address y state z data_length x bit_buffer w temp_buffer v available_bits u
 
   -- init stream reader
   local bit_buffer = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
@@ -32,7 +32,7 @@ function inflate(data_string, data_address, data_length)
   local temp_buffer = 0     -- temp chunk buffer
   local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
 
-  -- [minify] replaces: flush_bits f char_lut s peek_bits h
+  -- [minify] replaces: flush_bits f peek_bits g
 
   -- get rid of n first bits
   local function flush_bits(nbits)
@@ -51,8 +51,7 @@ function inflate(data_string, data_address, data_length)
 
   -- peek n bits from the stream
   local function peek_bits(nbits)
-    -- we need "while" instead of "do" because when reading
-    -- from memory we may need more than one 8-bit run.
+    -- [minify] replaces: nbits i
     while available_bits < nbits do
       -- not enough data in the bit buffer:
       -- if there is still data in memory, read the next byte; otherwise
@@ -98,37 +97,39 @@ function inflate(data_string, data_address, data_length)
     --return band(shl(bit_buffer, 16), 2 ^ nbits - 1)
   end
 
-  -- [minify] can reuse: data_string z data_address y data_length x
-  -- [minify] can reuse: bit_buffer w temp_buffer v available_bits u state t char_lut s
-  -- [minify] replaces: read_bits z read_symbol y
+  -- [minify] can reuse: data_string s char_lut t
+  -- [minify] can reuse: data_address y data_length x bit_buffer w temp_buffer v available_bits u state z
+  -- [minify] replaces: read_bits u read_symbol v
 
   -- get a number of n bits from stream and flush them
   local function read_bits(nbits)
+    -- [minify] replaces: nbits i
     return peek_bits(nbits), flush_bits(nbits)
   end
 
   -- get next variable value from stream, according to huffman table
   local function read_symbol(huff_tree)
+    -- [minify] replaces: huff_tree i
     -- require at least n bits, even if only p<n bytes may be actually consumed
     local j = peek_bits(huff_tree.max_bits)
     flush_bits(huff_tree[j] % 1 * 16)
     return flr(huff_tree[j])
   end
 
-  -- [minify] can reuse: peek_bits h flush_bits f
-  -- [minify] replaces: build_huff_tree h
+  -- [minify] can reuse: peek_bits g flush_bits f
+  -- [minify] replaces: build_huff_tree g
 
   -- build a huffman table
-  local function build_huff_tree(tree_desc)
-    -- [minify] replaces: tree s reversed_code t
+  local function build_huff_tree(huff_tree_desc)
+    -- [minify] replaces: huff_tree_desc i max_bits j tree t reversed_code z code u
     local tree = { max_bits = 1 }
     for j = 1, 288 do
-      tree.max_bits = max(tree.max_bits, tree_desc[j] or 0)
+      tree.max_bits = max(tree.max_bits, huff_tree_desc[j] or 0)
     end
     local code = 0
     for l = 1, 18 do -- for some reason "18" compresses better than "17" or even "16"!
       for j = 1, 288 do
-        if tree_desc[j] == l then
+        if l == huff_tree_desc[j] then
           -- flip the first l bits of the current code
           local reversed_code = 0
           for j = 1, l do reversed_code += shl(band(shr(code, j - 1), 1), l - j) end
@@ -146,7 +147,7 @@ function inflate(data_string, data_address, data_length)
   end
 
   -- [minify] replaces: write_byte f
-  -- [minify] replaces: output_buffer x output_pos w
+  -- [minify] replaces: output_buffer t output_pos w
 
   -- init stream writer
   local output_buffer = {} -- output array (32-bit numbers)
@@ -154,9 +155,10 @@ function inflate(data_string, data_address, data_length)
 
   -- write_byte 8 bits to the output, packed into a 32-bit number
   local function write_byte(byte)
-    local d = (output_pos) % 1  -- the parentheses here help compressing the code!
-    local p = flr(output_pos)
-    output_buffer[p] = byte * 256 ^ (4 * d - 2) + (output_buffer[p] or 0)
+    -- [minify] replaces: byte i
+    local j = (output_pos) % 1  -- the parentheses here help compressing the code!
+    local k = flr(output_pos)
+    output_buffer[k] = byte * 256 ^ (4 * j - 2) + (output_buffer[k] or 0)
     output_pos += 1 / 4
   end
 
@@ -179,7 +181,7 @@ function inflate(data_string, data_address, data_length)
         write_byte(read_bits(8))
       end
     else
-      -- replaces: lit_count l len_count s count j
+      -- replaces: lit_count l len_count t count j
       local lit_tree_desc = {}
       local len_tree_desc = {}
       if i < 2 then
@@ -237,9 +239,9 @@ function inflate(data_string, data_address, data_length)
           local distance = 1 + read_varint(read_symbol(len_tree_desc), 2)
           -- read back all bytes and append them to the output
           for i = -2, size_minus_3 do
-            local d = (output_pos - distance / 4) % 1
-            local p = flr(output_pos - distance / 4)
-            write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
+            local j = (output_pos - distance / 4) % 1
+            local k = flr(output_pos - distance / 4)
+            write_byte(band(output_buffer[k] / 256 ^ (4 * j - 2), 255))
           end
         end
         symbol = read_symbol(lit_tree_desc)
@@ -251,34 +253,19 @@ function inflate(data_string, data_address, data_length)
 end
 
 -- rename functions, in order of appearance:
---   replaces: read_varint h
---
--- rename local variables in functions to the same name
--- as their containing functions:
---   replaces: tree h (in build_huff_tree)
--- or not:
+--   replaces: read_varint g
 --   replaces: symbol l len_code l  (local variables in do_block)
 --
 -- "i" is typically used for function arguments, sometimes "q":
 --   replaces: nbits i          (first argument of read_bits/peek_bits/flush_bits)
---   replaces: byte i           (first argument of write_byte)
---   replaces: huff_tree i      (first arg of read_symbol)
---   replaces: tree_desc i      (first arg of build_huff_tree)
---   replaces: lit_tree o       (first arg of do_block)
---   replaces: len_tree i       (second arg of do_block)
 --
 --   replaces: lit_tree_desc k  (only appears after tree_desc is no longer used)
 --   replaces: len_tree_desc q
 --
--- this is not a local variable but a table member, however
--- the string "i=1" appears just after it is initialised, so
--- we can save one byte by calling it "i" too:
---   replaces: max_bits i
---
 -- not cleaned yet:
 --   replaces: read_tree r
---   replaces: distance q size_minus_3 r
---   replaces: code q
+--   replaces: tree_desc i
+--   replaces: distance q size_minus_3 l
 --
--- free: a b c d e f g h i j k l m m n o p q r s t u v w x y z
+-- free: a b c d e f g h i j k l m n o p q r s t u v w x y z
 
