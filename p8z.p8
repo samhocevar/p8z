@@ -36,6 +36,7 @@ function inflate(data_string, data_address, data_length)
 
   -- get rid of n first bits
   local function flush_bits(nbits)
+    -- [minify] replaces: nbits i
     available_bits -= nbits
     bit_buffer = lshr(bit_buffer, nbits)
   end
@@ -181,7 +182,8 @@ function inflate(data_string, data_address, data_length)
         write_byte(read_bits(8))
       end
     else
-      -- replaces: lit_count l len_count t count j
+      -- [minify] replaces: lit_tree_desc k len_tree_desc q
+      -- [minify] replaces: lit_count l len_count i tree_desc t
       local lit_tree_desc = {}
       local len_tree_desc = {}
       if i < 2 then
@@ -200,16 +202,17 @@ function inflate(data_string, data_address, data_length)
         for j = -3, read_bits(4) do tree_desc[j % 19 + 1] = read_bits(3) end
         local g = build_huff_tree(tree_desc)
 
-        local function read_tree(tree_desc, count)
-          while #tree_desc < count do
+        -- [minify] replaces: read_tree r description k count l
+        local function read_tree(description, count)
+          while #description < count do
             local g = read_symbol(g)
             if g >= 19 then                                                        -- debug
               error("wrong entry in depth table for literal/length alphabet: "..g) -- debug
             end                                                                    -- debug
-                if g == 16 then for j = -2, read_bits(2)     do add(tree_desc, tree_desc[#tree_desc]) end
-            elseif g == 17 then for j = -2, read_bits(3)     do add(tree_desc, 0) end
-            elseif g == 18 then for j = -2, read_bits(7) + 8 do add(tree_desc, 0) end
-            else add(tree_desc, g) end
+                if g == 16 then for j = -2, read_bits(2)     do add(description, description[#description]) end
+            elseif g == 17 then for j = -2, read_bits(3)     do add(description, 0) end
+            elseif g == 18 then for j = -2, read_bits(7) + 8 do add(description, 0) end
+            else add(description, g) end
           end
         end
 
@@ -220,15 +223,17 @@ function inflate(data_string, data_address, data_length)
       lit_tree_desc = build_huff_tree(lit_tree_desc)
       len_tree_desc = build_huff_tree(len_tree_desc)
 
-      local function read_varint(symbol, n)
-        if symbol > n then
-          local i = flr(symbol / n - 1)
-          symbol = shl(symbol % n + n, i) + read_bits(i)
+      -- [minify] replaces: read_varint g sym_code i
+      local function read_varint(sym_code, k)
+        if sym_code > k then
+          local j = flr(sym_code / k - 1)
+          sym_code = shl(sym_code % k + k, j) + read_bits(j)
         end
-        return symbol
+        return sym_code
       end
 
       -- decompress the block using the two huffman tables
+      -- [minify] replaces: symbol i size_minus_3 l distance q
       local symbol = read_symbol(lit_tree_desc)
       while symbol != 256 do
         if symbol < 256 then
@@ -238,7 +243,7 @@ function inflate(data_string, data_address, data_length)
           local size_minus_3 = symbol < 285 and read_varint(symbol - 257, 4) or 255
           local distance = 1 + read_varint(read_symbol(len_tree_desc), 2)
           -- read back all bytes and append them to the output
-          for i = -2, size_minus_3 do
+          for j = -2, size_minus_3 do
             local j = (output_pos - distance / 4) % 1
             local k = flr(output_pos - distance / 4)
             write_byte(band(output_buffer[k] / 256 ^ (4 * j - 2), 255))
@@ -251,21 +256,4 @@ function inflate(data_string, data_address, data_length)
 
   return output_buffer
 end
-
--- rename functions, in order of appearance:
---   replaces: read_varint g
---   replaces: symbol l len_code l  (local variables in do_block)
---
--- "i" is typically used for function arguments, sometimes "q":
---   replaces: nbits i          (first argument of read_bits/peek_bits/flush_bits)
---
---   replaces: lit_tree_desc k  (only appears after tree_desc is no longer used)
---   replaces: len_tree_desc q
---
--- not cleaned yet:
---   replaces: read_tree r
---   replaces: tree_desc i
---   replaces: distance q size_minus_3 l
---
--- free: a b c d e f g h i j k l m n o p q r s t u v w x y z
 
