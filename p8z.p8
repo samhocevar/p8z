@@ -23,15 +23,16 @@ end                     -- debug
 -- main entry point for inflate()
 --
 function inflate(data_string, data_address, data_length)
-  -- [minify] replaces: state x bit_buffer w temp_buffer v available_bits u
+  -- [minify] replaces: data_string z data_address y data_length x
+  -- [minify] replaces: bit_buffer w temp_buffer v available_bits u state t
 
   -- init stream reader
-  local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
   local bit_buffer = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
   local available_bits = 0  -- number of bits in buffer
   local temp_buffer = 0     -- temp chunk buffer
+  local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
 
-  -- [minify] replaces: flush_bits f char_lut y peek_bits h
+  -- [minify] replaces: flush_bits f char_lut s peek_bits h
 
   -- get rid of n first bits
   local function flush_bits(nbits)
@@ -53,7 +54,7 @@ function inflate(data_string, data_address, data_length)
     -- we need "while" instead of "do" because when reading
     -- from memory we may need more than one 8-bit run.
     while available_bits < nbits do
-      -- not enough data in the stream:
+      -- not enough data in the bit buffer:
       -- if there is still data in memory, read the next byte; otherwise
       -- unpack the next 8 characters of base59 data into 47 bits of
       -- information that we insert into bit_buffer in chunks of 16 or
@@ -93,11 +94,13 @@ function inflate(data_string, data_address, data_length)
     return lshr(shl(bit_buffer, 32 - nbits), 16 - nbits)
     -- this cannot work because of read_bits(16)
     -- maybe bring this back if we disable uncompressed blocks?
+    -- or maybe only allow 15-bit-length uncompressed blocks?
     --return band(shl(bit_buffer, 16), 2 ^ nbits - 1)
   end
 
-  -- [minify] can reuse: state x bit_buffer w temp_buffer v available_bits u
-  -- [minify] replaces: read_bits x read_symbol w
+  -- [minify] can reuse: data_string z data_address y data_length x
+  -- [minify] can reuse: bit_buffer w temp_buffer v available_bits u state t char_lut s
+  -- [minify] replaces: read_bits z read_symbol y
 
   -- get a number of n bits from stream and flush them
   local function read_bits(nbits)
@@ -112,11 +115,12 @@ function inflate(data_string, data_address, data_length)
     return flr(huff_tree[j])
   end
 
-  -- [minify] can reuse: flush_bits f
-  -- [minify] replaces: build_huff_tree f
+  -- [minify] can reuse: peek_bits h flush_bits f
+  -- [minify] replaces: build_huff_tree h
 
   -- build a huffman table
   local function build_huff_tree(tree_desc)
+    -- [minify] replaces: tree s reversed_code t
     local tree = { max_bits = 1 }
     for j = 1, 288 do
       tree.max_bits = max(tree.max_bits, tree_desc[j] or 0)
@@ -141,7 +145,8 @@ function inflate(data_string, data_address, data_length)
     return tree
   end
 
-  -- [minify] replaces: output_buffer j output_pos v write_byte u
+  -- [minify] replaces: write_byte f
+  -- [minify] replaces: output_buffer x output_pos w
 
   -- init stream writer
   local output_buffer = {} -- output array (32-bit numbers)
@@ -174,7 +179,7 @@ function inflate(data_string, data_address, data_length)
         write_byte(read_bits(8))
       end
     else
-      -- replaces: lit_count l len_count y count j
+      -- replaces: lit_count l len_count s count j
       local lit_tree_desc = {}
       local len_tree_desc = {}
       if i < 2 then
@@ -213,7 +218,7 @@ function inflate(data_string, data_address, data_length)
       lit_tree_desc = build_huff_tree(lit_tree_desc)
       len_tree_desc = build_huff_tree(len_tree_desc)
 
-      local function read_int(symbol, n)
+      local function read_varint(symbol, n)
         if symbol > n then
           local i = flr(symbol / n - 1)
           symbol = shl(symbol % n + n, i) + read_bits(i)
@@ -228,10 +233,10 @@ function inflate(data_string, data_address, data_length)
           -- write a literal symbol to the output
           write_byte(symbol)
         else
-          local size = symbol < 285 and read_int(symbol - 257, 4) or 255
-          local distance = 1 + read_int(read_symbol(len_tree_desc), 2)
-          -- read back size+3 bytes and append them to the output
-          for i = -2, size do
+          local size_minus_3 = symbol < 285 and read_varint(symbol - 257, 4) or 255
+          local distance = 1 + read_varint(read_symbol(len_tree_desc), 2)
+          -- read back all bytes and append them to the output
+          for i = -2, size_minus_3 do
             local d = (output_pos - distance / 4) % 1
             local p = flr(output_pos - distance / 4)
             write_byte(band(output_buffer[p] / 256 ^ (4 * d - 2), 255))
@@ -245,14 +250,8 @@ function inflate(data_string, data_address, data_length)
   return output_buffer
 end
 
--- free: g
---
--- strategy for minifying (renaming variables):
---
---   replaces: data_string s data_address p data_length l
---
 -- rename functions, in order of appearance:
---   replaces: read_int h
+--   replaces: read_varint h
 --
 -- rename local variables in functions to the same name
 -- as their containing functions:
@@ -276,14 +275,10 @@ end
 -- we can save one byte by calling it "i" too:
 --   replaces: max_bits i
 --
--- we can also rename this because "j" is only used as
--- a local variable in functions that do not use output_buffer:
---   replaces: output_buffer j
---
 -- not cleaned yet:
 --   replaces: read_tree r
---   replaces: distance q size r
---   replaces: code c reversed_code o
+--   replaces: distance q size_minus_3 r
+--   replaces: code q
 --
 -- free: a b c d e f g h i j k l m m n o p q r s t u v w x y z
 
