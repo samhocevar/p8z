@@ -159,7 +159,7 @@ function inflate(data_string, data_address, data_length)
     -- [minify] replaces: byte i
     local j = (output_pos) % 1  -- the parentheses here help compressing the code!
     local k = flr(output_pos)
-    output_buffer[k] = byte * 256 ^ (4 * j - 2) + (output_buffer[k] or 0)
+    output_buffer[k] = rotl(byte, j * 32 - 16) + (output_buffer[k] or 0)
     output_pos += 1 / 4
   end
 
@@ -244,7 +244,7 @@ function inflate(data_string, data_address, data_length)
           for j = -2, size_minus_3 do
             local j = (output_pos - distance / 4) % 1
             local k = flr(output_pos - distance / 4)
-            write_byte(band(output_buffer[k] / 256 ^ (4 * j - 2), 255))
+            write_byte(band(rotr(output_buffer[k], j * 32 - 16), 255))
           end
         end
         symbol = read_symbol(lit_tree_desc)
