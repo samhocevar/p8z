@@ -24,6 +24,12 @@ function inflate(data_string, data_address, data_length)
     bit_buffer = lshr(bit_buffer, nbits)
   end
 
+  -- cast a value to a number (trick: can use shr() instead!)
+  -- [minify] replaces: cast_to_int shr
+  local function cast_to_int(x) -- debug
+    return shr(x)               -- debug
+  end                           -- debug
+
   -- lookup table for peek_bits()
   --  - indices 1 and 2 are the higher bits (>=32) of 59^7 and 59^8
   --    used to compute these powers
@@ -51,9 +57,9 @@ function inflate(data_string, data_address, data_length)
         local e = 2^-16
         local p = 0 temp_buffer = 0
         for i = 1, 8 do
-          local c = char_lut[sub(data_string, i, i)] or 0
+          local c = cast_to_int(char_lut[sub(data_string, i, i)])
           temp_buffer += e % 1 * c
-          p += (lshr(e, 16) + (char_lut[i - 6] or 0)) * c
+          p += (lshr(e, 16) + cast_to_int(char_lut[i - 6])) * c
           e *= 59
         end
         data_string = sub(data_string, 9)
@@ -108,7 +114,7 @@ function inflate(data_string, data_address, data_length)
     -- [minify] replaces: huff_tree_desc i max_bits j tree t reversed_code z code u
     local tree = { max_bits = 1 }
     for j = 1, 288 do
-      tree.max_bits = max(tree.max_bits, huff_tree_desc[j] or 0)
+      tree.max_bits = max(tree.max_bits, cast_to_int(huff_tree_desc[j]))
     end
     local code = 0
     for l = 1, 18 do -- for some reason "18" compresses better than "17" or even "16"!
@@ -142,7 +148,7 @@ function inflate(data_string, data_address, data_length)
     -- [minify] replaces: byte i
     local j = (output_pos) % 1  -- the parentheses here help compressing the code!
     local k = flr(output_pos)
-    output_buffer[k] = rotl(byte, j * 32 - 16) + (output_buffer[k] or 0)
+    output_buffer[k] = rotl(byte, j * 32 - 16) + cast_to_int(output_buffer[k])
     output_pos += 1 / 4
   end
 
