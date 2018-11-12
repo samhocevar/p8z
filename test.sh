@@ -45,7 +45,7 @@ test_common() {
   echo 'c=' >> "$TMPFILE.tmp"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
   cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
-  echo "t=inflate(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true))" >> "$TMPFILE.tmp"
+  echo "t=inflate(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true)) if puts and #t < 128 then puts(t) end" >> "$TMPFILE.tmp"
   z8tool --data "$TMPFILE.data" "$TMPFILE.tmp" --top8 > "$TMPFILE"
   rm -f "$TMPFILE.tmp" "$TMPFILE.data"
   out="$($TOOL "$TMPFILE")"
@@ -60,7 +60,7 @@ test_string() {
 }
 
 test_file() {
-  echo "# Compressing files: $*"
+  echo "# Compressing file: $1"
   test_common "$@"
 }
 

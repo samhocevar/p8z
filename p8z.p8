@@ -3,23 +3,6 @@ version 16
 __lua__
 
 --
--- debug function to display hex numbers with minimal chars
---
-local function strx(nbits)                                  -- debug
-  local s = sub(tostr(nbits, 1), 3, 6)                      -- debug
-  while #s > 1 and sub(s, 1, 1) == "0" do s = sub(s, 2) end -- debug
-  return "0x"..s                                            -- debug
-end                                                         -- debug
-
---
--- error reporting
---
-local function error(s) -- debug
-  printh(s)             -- debug
-  abort()               -- debug
-end                     -- debug
-
---
 -- main entry point for inflate()
 --
 function inflate(data_string, data_address, data_length)
@@ -252,4 +235,43 @@ function inflate(data_string, data_address, data_length)
     end
   end
 end
+
+--
+-- debug function to display hex numbers with minimal chars
+--
+local function strx(nbits)                                  -- debug
+  local s = sub(tostr(nbits, 1), 3, 6)                      -- debug
+  while #s > 1 and sub(s, 1, 1) == "0" do s = sub(s, 2) end -- debug
+  return "0x"..s                                            -- debug
+end                                                         -- debug
+
+--
+-- error reporting
+--
+local function error(s) -- debug
+  printh(s)             -- debug
+  abort()               -- debug
+end                     -- debug
+
+--
+-- print to stdout using ^ and M- notation
+--
+local function puts(t)                                                     -- debug
+  local function chr(i) return sub(" !\"#$%&'()*+,-./0123456789:;<=>?@"..  -- debug
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\127", -- debug
+    i - 32, i - 32)                                                        -- debug
+  end                                                                      -- debug
+  local lut = {}                                                           -- debug
+  for i = 1, 128 do lut[i] = "^"..chr(bxor(i, 64)) end                     -- debug
+  for i = 32, 127 do lut[i] = chr(i) end                                   -- debug
+  for i = 129, 256 do lut[i] = "M-"..lut[i - 128] end                      -- debug
+  lut[11] = "\n" lut[14] = "\r"                                            -- debug
+  local s = ""                                                             -- debug
+  for i = 1, #t do                                                         -- debug
+    for j = 2, 5 do                                                        -- debug
+      s = s..lut[1 + band(rotr(t[i], 8 * j), 255)]                         -- debug
+    end                                                                    -- debug
+  end                                                                      -- debug
+  printh(s)                                                                -- debug
+end                                                                        -- debug
 
