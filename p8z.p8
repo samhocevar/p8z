@@ -144,7 +144,7 @@ function inflate(data_string, data_address, data_length)
       end
       code += code
     end
-    return tree
+    return (tree) -- "return t end" has as many tokens as "return(t)end" but has lower entropy
   end
 
   -- [minify] replaces: write_byte f
@@ -169,7 +169,7 @@ function inflate(data_string, data_address, data_length)
   for j = 1, 288 do -- minifying trick; there's never going to be 288 blocks!
     if read_bits(1) < 1 then
       if read_bits(1) < 1 then
-        return output_buffer
+        return (output_buffer)
       end
       -- inflate uncompressed byte array
       -- we do not align the input buffer to a byte boundary, because there
@@ -227,7 +227,7 @@ function inflate(data_string, data_address, data_length)
           local k = flr(sym_code / j - 1)
           sym_code = shl(sym_code % j + j, k) + read_bits(k)
         end
-        return sym_code
+        return (sym_code)
       end
 
       -- decompress the block using the two huffman tables
