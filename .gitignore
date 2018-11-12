@@ -1,5 +1,7 @@
 p8z
+minify
 *.o
 zlib/.zlib.c
+
 .tmp.p8
 .p8z-*.p8

@@ -189,8 +189,8 @@ function inflate(data_string, data_address, data_length)
         for j = -3, read_bits(4) do tree_desc[j % 19 + 1] = read_bits(3) end
         local g = build_huff_tree(tree_desc)
 
-        -- [minify] replaces: read_tree r description k count l
-        local function read_tree(description, count)
+        -- [minify] replaces: read_tree_desc r description k count l
+        local function read_tree_desc(description, count)
           while #description < count do
             local g = read_symbol(g)
             if g >= 19 then                                                        -- debug
@@ -203,8 +203,8 @@ function inflate(data_string, data_address, data_length)
           end
         end
 
-        read_tree(lit_tree_desc, lit_count)
-        read_tree(len_tree_desc, len_count)
+        read_tree_desc(lit_tree_desc, lit_count)
+        read_tree_desc(len_tree_desc, len_count)
       end
 
       lit_tree_desc = build_huff_tree(lit_tree_desc)

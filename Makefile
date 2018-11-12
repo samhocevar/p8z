@@ -2,12 +2,15 @@
 
 CPPFLAGS = -I./zlib -DP8Z -DZ_SOLO -DNO_GZIP -DHAVE_MEMCPY -Dlocal= -Os -g -ggdb -Wall -Wextra
 
-all: p8z
+all: p8z minify
 
 clean:
 	rm -f *.o .*.p8 p8z zlib/.zlib.*
 
 p8z: p8z.o zlib/.zlib.o
+	$(CXX) $(CPPFLAGS) $^ -o $@
+
+minify: minify.cpp
 	$(CXX) $(CPPFLAGS) $^ -o $@
 
 p8z.o: p8z.cpp
