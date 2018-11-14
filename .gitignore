@@ -1,5 +1,6 @@
 p8z
 minify
+analyze
 *.o
 zlib/.zlib.c
 
