@@ -44,6 +44,11 @@ int main()
         static std::regex re_comment("(^.*-- *debug| *--).*");
         line = std::regex_replace(line, re_comment, "");
 
+        // Ignore empty lines
+        static std::regex re_empty("^ *$");
+        if (std::regex_match(line, re_empty))
+            continue;
+
         // Protect lines that contain +=, -= etc.
         static std::regex re_compound(".*[-+*/%]=.*");
         line = std::regex_replace(line, re_compound, "X $0 X");
