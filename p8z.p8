@@ -25,8 +25,8 @@ function inflate(data_string, data_address, data_length)
   end
 
   -- cast a value to a number (trick: can use shr() instead!)
-  -- [minify] replaces: cast_to_int shr
-  local function cast_to_int(x) -- debug
+  -- [minify] replaces: cast_to_num shr
+  local function cast_to_num(x) -- debug
     return shr(x)               -- debug
   end                           -- debug
 
@@ -54,12 +54,13 @@ function inflate(data_string, data_address, data_length)
         data_address += 1
         data_length -= 1
       elseif state < 1 then
+        temp_buffer = 0
+        local p = 0
         local e = 2^-16
-        local p = 0 temp_buffer = 0
         for i = 1, 8 do
-          local c = cast_to_int(char_lut[sub(data_string, i, i)])
+          local c = cast_to_num(char_lut[sub(data_string, i, i)])
           temp_buffer += e % 1 * c
-          p += (lshr(e, 16) + cast_to_int(char_lut[i - 6])) * c
+          p += (lshr(e, 16) + cast_to_num(char_lut[i - 6])) * c
           e *= 59
         end
         data_string = sub(data_string, 9)
@@ -114,7 +115,7 @@ function inflate(data_string, data_address, data_length)
     -- [minify] replaces: huff_tree_desc i max_bits j tree t reversed_code z code u
     local tree = { max_bits = 1 }
     for j = 1, 288 do
-      tree.max_bits = max(tree.max_bits, cast_to_int(huff_tree_desc[j]))
+      tree.max_bits = max(tree.max_bits, cast_to_num(huff_tree_desc[j]))
     end
     local code = 0
     for l = 1, 18 do -- for some reason "18" compresses better than "17" or even "16"!
@@ -148,7 +149,7 @@ function inflate(data_string, data_address, data_length)
     -- [minify] replaces: byte i
     local j = (output_pos) % 1  -- the parentheses here help compressing the code!
     local k = flr(output_pos)
-    output_buffer[k] = rotl(byte, j * 32 - 16) + cast_to_int(output_buffer[k])
+    output_buffer[k] = rotl(byte, j * 32 - 16) + cast_to_num(output_buffer[k])
     output_pos += 1 / 4
   end
 
