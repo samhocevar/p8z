@@ -8,7 +8,7 @@
 #include <unordered_set>
 
 // The PICO-8 1-byte charset (excluding "\n")
-#define CHARSET " 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_"
+std::string CHARSET = " 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_";
 
 int best_streak(std::string const &input, int start_pos, std::unordered_set<char> const &already_excluded)
 {
@@ -28,12 +28,17 @@ int main()//int argc, char *argv[])
     auto input = std::string{ std::istreambuf_iterator<char>(std::cin),
                               std::istreambuf_iterator<char>() };
 
+    std::string prefix = ",i";
+    std::string suffix = "do t[sub(";
+
     // Exclude characters that would be encoded as multibyte
     std::unordered_set<char> excluded;
     for (char c : input)
         excluded.insert(c);
     for (char c : CHARSET)
         excluded.erase(c);
+    for (char c : prefix + suffix)
+        excluded.insert(c);
 
     // Replace inline strings with """"""" sequences
     for (int pos = 0, in_string = 0; pos < (int)input.size(); ++pos)
@@ -46,7 +51,7 @@ int main()//int argc, char *argv[])
             input[pos] = '"';
     }
 
-    std::string result;
+    std::string result = prefix;
 
     for (int iter = 0; iter < 10; ++iter)
     {
@@ -85,6 +90,9 @@ int main()//int argc, char *argv[])
     for (char c : CHARSET)
         if (excluded.count(c) == 0)
             result += c;
+
+    // Handle suffix
+    result += suffix;
 
     printf("Final string: \"%s\"\n", result.c_str());
 }
