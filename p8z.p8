@@ -37,7 +37,7 @@ function inflate(data_string, data_address, data_length)
   --    base string is not important but we exploit it to make our
   --    compressed code shorter
   local char_lut = { 9, 579 }
-  for i = 1, 58 do char_lut[sub(",i])v+=e%1*c579}f#k<lx>0q/42368aghjmnprwyz!{:;.~_do t[sub(", i, i)] = i end
+  for i = 1, 58 do char_lut[sub(",i])v+=e%1*c579}f#k<lmax>0q/42368ghjnprwyz!{:;.~_do t[sub(", i, i)] = i end
 
   -- peek n bits from the stream
   local function peek_bits(nbits)

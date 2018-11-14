@@ -10,11 +10,24 @@
 // The PICO-8 1-byte charset (excluding "\n")
 std::string CHARSET = " 0123456789abcdefghijklmnopqrstuvwxyz!#%(){}[]<>+=/*:;.,~_";
 
-int best_streak(std::string const &input, int start_pos, std::unordered_set<char> const &already_excluded)
+int best_streak(std::string const &input, int start_pos, std::string const &current_lut, std::unordered_set<char> const &already_excluded)
 {
     std::unordered_set<char> excluded = already_excluded;
 
+    // Skip excluded chars until we reach EOF or a non-excluded char
     int best_len = 0;
+    while (start_pos + best_len < (int)input.size()
+            && excluded.count(input[start_pos + best_len]))
+        ++best_len;
+
+    // Check that _all_ skipped characters match the current LUT
+    if (best_len > (int)current_lut.size())
+        return 0;
+    for (int i = 0; i < best_len; ++i)
+        if (current_lut[current_lut.size() - 1 - i] != input[start_pos + i])
+            return 0;
+
+    // Count how many more characters match
     while (start_pos + best_len < (int)input.size()
             && excluded.count(input[start_pos + best_len]) == 0)
         excluded.insert(input[start_pos + best_len++]);
@@ -60,7 +73,7 @@ int main()//int argc, char *argv[])
 
         for (int pos = 0; pos < (int)input.size(); ++pos)
         {
-            int size = best_streak(input, pos, excluded);
+            int size = best_streak(input, pos, result, excluded);
 
             if (size < 3)
                 continue;
@@ -68,9 +81,10 @@ int main()//int argc, char *argv[])
             float score = 0;
             for (int i = 0; i < size; ++i)
                 score += 1.f / frequencies[input[pos + i]];
+            score *= size - 2;
 
-            //if (score > best_score)
-            if (size > best_size)
+            if (score > best_score)
+            //if (size > best_size)
             {
                 best_score = score;
                 best_pos = pos;
@@ -81,7 +95,12 @@ int main()//int argc, char *argv[])
         printf("best position (%f) %d: %d -- '%s'\n",
                best_score, best_pos, best_size, input.substr(best_pos, best_size).c_str());
 
-        result += input.substr(best_pos, best_size).c_str();
+        for (int i = 0; i < best_size; ++i)
+            if (!excluded.count(input[best_pos + i]))
+            {
+                result += input.substr(best_pos + i, best_size - i).c_str();
+                break;
+            }
 
         for (int i = 0; i < best_size; ++i)
             excluded.insert(input[best_pos + i]);
