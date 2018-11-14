@@ -80,7 +80,7 @@ function inflate(data_string, data_address, data_length)
     end
     --printh("peek_bits("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits))
     --       .." [bit_buffer = "..strx(shl(bit_buffer, 16)).."]")
-    return lshr(shl(bit_buffer, 32 - nbits), 16 - nbits)
+    return (lshr(shl(bit_buffer, 32 - nbits), 16 - nbits))
     -- this cannot work because of read_bits(16)
     -- maybe bring this back if we disable uncompressed blocks?
     -- or maybe only allow 15-bit-length uncompressed blocks?
@@ -103,7 +103,7 @@ function inflate(data_string, data_address, data_length)
     -- require at least n bits, even if only p<n bytes may be actually consumed
     local j = peek_bits(huff_tree.max_bits)
     flush_bits(huff_tree[j] % 1 * 16)
-    return flr(huff_tree[j])
+    return (flr(huff_tree[j]))
   end
 
   -- [minify] can reuse: peek_bits g flush_bits f
