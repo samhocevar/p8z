@@ -7,15 +7,23 @@ TMPFILE=.p8z-temp.p8
 EXTRA=2048
 
 TOOL="z8tool --headless"
-if [ "x$1" = "x--pico8" ]; then
-  export DISPLAY=:0
-  TMPFILE=.p8z-pico8.p8
-  TOOL="pico8 -x"
-fi
+while [ -n "$1" ]; do
+  case "$1" in
+    --pico8)
+      export DISPLAY=:0
+      TMPFILE=.p8z-pico8.p8
+      TOOL="pico8 -x"
+      ;;
+    --no-minify)
+      NO_MINIFY=1
+      ;;
+  esac
+  shift
+done
 
 minify() {
   head -n 3 "$1"
-#  cat "$1" | tail -n +4; return
+  if [ -n "$NO_MINIFY" ]; then cat "$1" | tail -n +4; return; fi
   ./minify < "$1"
 }
 
