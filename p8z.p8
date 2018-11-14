@@ -24,10 +24,10 @@ function inflate(data_string, data_address, data_length)
     bit_buffer = lshr(bit_buffer, nbits)
   end
 
-  -- cast a value to a number (trick: can use shr() instead!)
-  -- [minify] replaces: cast_to_num shr
+  -- cast a value to a number (trick: can use lshr() instead!)
+  -- [minify] replaces: cast_to_num lshr
   local function cast_to_num(x) -- debug
-    return shr(x)               -- debug
+    return lshr(x)              -- debug
   end                           -- debug
 
   -- lookup table for peek_bits()
@@ -49,7 +49,7 @@ function inflate(data_string, data_address, data_length)
       -- information that we insert into bit_buffer in chunks of 16 or
       -- 15 bits.
       if data_length and data_length > 0 then
-        bit_buffer += shr(peek(data_address), 16 - available_bits)
+        bit_buffer += lshr(peek(data_address), 16 - available_bits)
         available_bits += 8
         data_address += 1
         data_length -= 1
@@ -123,7 +123,7 @@ function inflate(data_string, data_address, data_length)
         if l == huff_tree_desc[j] then
           -- flip the first l bits of the current code
           local reversed_code = 0
-          for j = 1, l do reversed_code += shl(band(shr(code, j - 1), 1), l - j) end
+          for j = 1, l do reversed_code += shl(band(lshr(code, j - 1), 1), l - j) end
           -- store all possible n-bit values that end with flip(code)
           while reversed_code < 2 ^ tree.max_bits do
             tree[reversed_code] = j - 1 + l / 16
