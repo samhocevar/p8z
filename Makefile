@@ -2,10 +2,13 @@
 
 CPPFLAGS = -I./zlib -DP8Z -DZ_SOLO -DNO_GZIP -DHAVE_MEMCPY -Dlocal= -Os -g -ggdb -Wall -Wextra
 
-all: p8z minify analyze
+all: p8u p8z minify analyze
 
 clean:
 	rm -f *.o .*.p8 p8z zlib/.zlib.*
+
+p8u: minify p8u.p8
+	./minify < p8u.p8 >| $@
 
 p8z: p8z.o zlib/.zlib.o
 	$(CXX) $(CPPFLAGS) $^ -o $@
