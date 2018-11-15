@@ -3,9 +3,9 @@ version 16
 __lua__
 
 --
--- main entry point for inflate()
+-- main entry point for p8u()
 --
-function inflate(data_string, data_address, data_length)
+function p8u(data_string, data_address, data_length)
   -- [minify] replaces: data_string s char_lut t
   -- [minify] replaces: data_address y state z data_length x bit_buffer w temp_buffer v available_bits u
 
