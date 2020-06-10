@@ -27,9 +27,9 @@ minify() {
   ./minify < "$1"
 }
 
-# Inspect p8z.p8 for stats
-echo "# Inspecting: p8z.p8"
-minify p8z.p8 > "$TMPFILE"
+# Inspect p8u.p8 for stats
+echo "# Inspecting: p8u.p8"
+minify p8u.p8 > "$TMPFILE"
 z8tool --inspect "$TMPFILE"
 echo "printh('Cart code: valid')" >> "$TMPFILE"
 $TOOL "$TMPFILE"
@@ -37,7 +37,7 @@ echo ""
 
 # Check that the code works
 test_common() {
-  minify p8z.p8 > "$TMPFILE.tmp"
+  minify p8u.p8 > "$TMPFILE.tmp"
   echo 'c=' >> "$TMPFILE.tmp"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
   cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
