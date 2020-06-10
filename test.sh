@@ -38,7 +38,7 @@ echo ""
 # Check that the code works
 test_common() {
   minify p8u.p8 > "$TMPFILE.tmp.p8"
-  echo 'c=' >> "$TMPFILE.tmp.p8"
+  printf 'c=' >> "$TMPFILE.tmp.p8"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
   cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp.p8"
   echo "t=p8u(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true)) if puts and #t < 128 then puts(t) end" >> "$TMPFILE.tmp.p8"
@@ -62,6 +62,7 @@ test_file() {
 
 test_string ""
 test_string "ABCD"
+test_string "abc123def456"
 test_string "11112222333344445555"
 test_string "21112222333344445555211122223333444455552111222233334444555511112222333344445555"
 test_string "to be or not to be or to be or maybe not to be or maybe finally to be..."

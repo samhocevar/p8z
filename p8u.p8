@@ -6,14 +6,13 @@ __lua__
 -- main entry point for p8u()
 --
 function p8u(data_string, data_address, data_length)
-  -- [minify] replaces: data_string s char_lut t
-  -- [minify] replaces: data_address y state z data_length x bit_buffer w temp_buffer v available_bits u
+  -- [minify] replaces: data_string s
+  -- [minify] replaces: data_address y data_length x bit_buffer w temp_buffer v available_bits u
 
   -- init stream reader
   local bit_buffer = 0      -- bit buffer, starting from bit 0 (= 0x.0001)
   local available_bits = 0  -- number of bits in buffer
-  local temp_buffer = 0     -- temp chunk buffer
-  local state = 0           -- 0: nothing in accumulator, 1: 2 chunks remaining, 2: 1 chunk remaining
+  local temp_buffer         -- temp chunk buffer
 
   -- [minify] replaces: flush_bits f peek_bits g
 
@@ -30,53 +29,36 @@ function p8u(data_string, data_address, data_length)
     return lshr(x)              -- debug
   end                           -- debug
 
-  -- lookup table for peek_bits()
-  --  - indices 1 and 2 are the higher bits (>=32) of 59^7 and 59^8
-  --    used to compute these powers
-  --  - string indices are for char -> byte lookups; the order in the
-  --    base string is not important but we exploit it to make our
-  --    compressed code shorter
-  local char_lut = { 9, 579 }
-  for i = 1, 58 do char_lut[sub(",i])v+=e%1*c579}f#k<lmax>0q/42368ghjnprwyz!{:;.~_do t[sub(", i, i)] = i end
-
   -- peek n bits from the stream
   local function peek_bits(nbits)
     -- [minify] replaces: nbits i
     while available_bits < nbits do
       -- not enough data in the bit buffer:
       -- if there is still data in memory, read the next byte; otherwise
-      -- unpack the next 8 characters of base59 data into 47 bits of
+      -- unpack the next 5 characters of base49 data into 28 bits of
       -- information that we insert into bit_buffer in chunks of 16 or
-      -- 15 bits.
+      -- 12 bits.
       if data_length and data_length > 0 then
         bit_buffer += lshr(peek(data_address), 16 - available_bits)
         available_bits += 8
         data_address += 1
         data_length -= 1
-      elseif state < 1 then
-        temp_buffer = 0
-        local p = 0
-        local e = 2^-16
-        for i = 1, 8 do
-          local c = cast_to_num(char_lut[sub(data_string, i, i)])
-          temp_buffer += e % 1 * c
-          p += (lshr(e, 16) + cast_to_num(char_lut[i - 6])) * c
-          e *= 59
-        end
-        data_string = sub(data_string, 9)
+      elseif temp_buffer then
         bit_buffer += shl(temp_buffer % 1, available_bits)
-        available_bits += 16
-        state += 1
-        temp_buffer = lshr(temp_buffer, 16) + p
-      elseif state < 2 then
-        bit_buffer += shl(temp_buffer % 1, available_bits)
-        available_bits += 16
-        state += 1
-        temp_buffer = lshr(temp_buffer, 16)
+        available_bits += 12
+        temp_buffer = nil
       else
+        temp_buffer = 0
+        local e = -~0 -- 0x0.0001
+        for i = 1, 5 do
+          local c = (ord(sub(data_string, i, i)) or 35) - 35 -- ord('#') == 35
+          temp_buffer += e * c
+          e *= 49
+        end
+        data_string = sub(data_string, 6) -- skip 5 chars
         bit_buffer += shl(temp_buffer % 1, available_bits)
-        available_bits += 15
-        state = 0
+        available_bits += 16
+        temp_buffer = lshr(temp_buffer, 16)
       end
     end
     --printh("peek_bits("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits))
@@ -89,7 +71,7 @@ function p8u(data_string, data_address, data_length)
   end
 
   -- [minify] can reuse: data_string s char_lut t
-  -- [minify] can reuse: data_address y data_length x bit_buffer w temp_buffer v available_bits u state z
+  -- [minify] can reuse: data_address y data_length x bit_buffer w temp_buffer v available_bits u
   -- [minify] replaces: read_bits u read_symbol v
 
   -- get a number of n bits from stream and flush them
@@ -264,13 +246,9 @@ end                     -- debug
 -- print to stdout using ^ and M- notation
 --
 local function puts(t)                                                     -- debug
-  local function chr(i) return sub(" !\"#$%&'()*+,-./0123456789:;<=>?@"..  -- debug
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\127", -- debug
-    i - 32, i - 32)                                                        -- debug
-  end                                                                      -- debug
   local lut = {}                                                           -- debug
-  for i = 1, 128 do lut[i] = "^"..chr(bxor(i, 64)) end                     -- debug
-  for i = 32, 127 do lut[i] = chr(i) end                                   -- debug
+  for i = 1, 128 do lut[i] = "^"..chr(bxor(i, 64) - 1) end                 -- debug
+  for i = 32, 127 do lut[i] = chr(i - 1) end                               -- debug
   for i = 129, 256 do lut[i] = "M-"..lut[i - 128] end                      -- debug
   lut[11] = "\n" lut[14] = "\r"                                            -- debug
   local s = ""                                                             -- debug
