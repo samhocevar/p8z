@@ -20,7 +20,7 @@ function p8u(data_string, data_address, data_length)
   local function flush_bits(nbits)
     -- [minify] replaces: nbits i
     available_bits -= nbits
-    bit_buffer = lshr(bit_buffer, nbits)
+    bit_buffer >>>= nbits
   end
 
   -- cast a value to a number (trick: can use lshr() instead!)
@@ -39,12 +39,12 @@ function p8u(data_string, data_address, data_length)
       -- information that we insert into bit_buffer in chunks of 16 or
       -- 12 bits.
       if data_length and data_length > 0 then
-        bit_buffer += lshr(peek(data_address), 16 - available_bits)
+        bit_buffer += peek(data_address) >>> 16 - available_bits
         available_bits += 8
         data_address += 1
         data_length -= 1
       elseif temp_buffer then
-        bit_buffer += shl(temp_buffer % 1, available_bits)
+        bit_buffer += temp_buffer % 1 << available_bits
         available_bits += 12
         temp_buffer = nil
       else
@@ -56,14 +56,14 @@ function p8u(data_string, data_address, data_length)
           e *= 49
         end
         data_string = sub(data_string, 6) -- skip 5 chars
-        bit_buffer += shl(temp_buffer % 1, available_bits)
+        bit_buffer += temp_buffer % 1 << available_bits
         available_bits += 16
-        temp_buffer = lshr(temp_buffer, 16)
+        temp_buffer >>>= 16
       end
     end
     --printh("peek_bits("..nbits..") = "..strx(lshr(shl(bit_buffer, 32-nbits), 16-nbits))
     --       .." [bit_buffer = "..strx(shl(bit_buffer, 16)).."]")
-    return (lshr(shl(bit_buffer, 32 - nbits), 16 - nbits))
+    return (bit_buffer << 32 - nbits) >>> 16 - nbits
     -- this cannot work because of read_bits(16)
     -- maybe bring this back if we disable uncompressed blocks?
     -- or maybe only allow 15-bit-length uncompressed blocks?
@@ -105,11 +105,11 @@ function p8u(data_string, data_address, data_length)
         if l == huff_tree_desc[j] then
           -- flip the first l bits of the current code
           local reversed_code = 0
-          for j = 1, l do reversed_code += shl(band(lshr(code, j - 1), 1), l - j) end
+          for j = 1, l do reversed_code += (code >>> j - 1 & 1) << l - j end
           -- store all possible n-bit values that end with flip(code)
-          while reversed_code < 2 ^ tree.max_bits do
+          while reversed_code < 1 << tree.max_bits do
             tree[reversed_code] = j - 1 + l / 16
-            reversed_code += 2 ^ l
+            reversed_code += 1 << l
           end
           code += 1
         end
@@ -131,7 +131,7 @@ function p8u(data_string, data_address, data_length)
     -- [minify] replaces: byte i
     local j = (output_pos) % 1  -- the parentheses here help compressing the code!
     local k = flr(output_pos)
-    output_buffer[k] = rotl(byte, j * 32 - 16) + cast_to_num(output_buffer[k])
+    output_buffer[k] = (byte <<> j * 32 - 16) + cast_to_num(output_buffer[k])
     output_pos += 1 / 4
   end
 
@@ -197,7 +197,7 @@ function p8u(data_string, data_address, data_length)
       local function read_varint(sym_code, j)
         if sym_code > j then
           local k = flr(sym_code / j - 1)
-          sym_code = shl(sym_code % j + j, k) + read_bits(k)
+          sym_code = (sym_code % j + j << k) + read_bits(k)
         end
         return (sym_code)
       end
@@ -216,7 +216,7 @@ function p8u(data_string, data_address, data_length)
           for j = -2, size_minus_3 do
             local j = (output_pos - distance / 4) % 1
             local k = flr(output_pos - distance / 4)
-            write_byte(band(rotr(output_buffer[k], j * 32 - 16), 255))
+            write_byte(output_buffer[k] >>< j * 32 - 16 & 255)
           end
         end
         symbol = read_symbol(lit_tree_desc)
@@ -245,18 +245,18 @@ end                     -- debug
 --
 -- print to stdout using ^ and M- notation
 --
-local function puts(t)                                                     -- debug
-  local lut = {}                                                           -- debug
-  for i = 1, 128 do lut[i] = "^"..chr(bxor(i, 64) - 1) end                 -- debug
-  for i = 32, 127 do lut[i] = chr(i - 1) end                               -- debug
-  for i = 129, 256 do lut[i] = "M-"..lut[i - 128] end                      -- debug
-  lut[11] = "\n" lut[14] = "\r"                                            -- debug
-  local s = ""                                                             -- debug
-  for i = 1, #t do                                                         -- debug
-    for j = 2, 5 do                                                        -- debug
-      s = s..lut[1 + band(rotr(t[i], 8 * j), 255)]                         -- debug
-    end                                                                    -- debug
-  end                                                                      -- debug
-  printh(s)                                                                -- debug
-end                                                                        -- debug
+local function puts(t)                                   -- debug
+  local lut = {}                                         -- debug
+  for i = 1, 128 do lut[i] = "^"..chr((i ^^ 64) - 1) end -- debug
+  for i = 32, 127 do lut[i] = chr(i - 1) end             -- debug
+  for i = 129, 256 do lut[i] = "M-"..lut[i - 128] end    -- debug
+  lut[11] = "\n" lut[14] = "\r"                          -- debug
+  local s = ""                                           -- debug
+  for i = 1, #t do                                       -- debug
+    for j = 2, 5 do                                      -- debug
+      s = s..lut[1 + (t[i] >>< 8 * j & 255)]             -- debug
+    end                                                  -- debug
+  end                                                    -- debug
+  printh(s)                                              -- debug
+end                                                      -- debug
 
