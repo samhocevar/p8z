@@ -86,7 +86,7 @@ function p8u(data_string, data_address, data_length)
     -- require at least n bits, even if only p<n bytes may be actually consumed
     local j = peek_bits(huff_tree.max_bits)
     flush_bits(huff_tree[j] % 1 * 16)
-    return (flr(huff_tree[j]))
+    return huff_tree[j] \ 1
   end
 
   -- [minify] can reuse: peek_bits g flush_bits f
@@ -129,8 +129,8 @@ function p8u(data_string, data_address, data_length)
   -- write_byte 8 bits to the output, packed into a 32-bit number
   local function write_byte(byte)
     -- [minify] replaces: byte i
-    local j = (output_pos) % 1  -- the parentheses here help compressing the code!
-    local k = flr(output_pos)
+    local j = output_pos % 1  -- the parentheses here help compressing the code!
+    local k = output_pos \ 1
     output_buffer[k] = (byte <<> j * 32 - 16) + cast_to_num(output_buffer[k])
     output_pos += 1 / 4
   end
@@ -196,7 +196,7 @@ function p8u(data_string, data_address, data_length)
       -- [minify] replaces: read_varint g sym_code i
       local function read_varint(sym_code, j)
         if sym_code > j then
-          local k = flr(sym_code / j - 1)
+          local k = sym_code \ j - 1
           sym_code = (sym_code % j + j << k) + read_bits(k)
         end
         return (sym_code)
@@ -215,7 +215,7 @@ function p8u(data_string, data_address, data_length)
           -- read back all bytes and append them to the output
           for j = -2, size_minus_3 do
             local j = (output_pos - distance / 4) % 1
-            local k = flr(output_pos - distance / 4)
+            local k = (output_pos - distance / 4) \ 1
             write_byte(output_buffer[k] >>< j * 32 - 16 & 255)
           end
         end
