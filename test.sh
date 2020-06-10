@@ -6,7 +6,7 @@ PATH="$PATH:$HOME/pico-8"
 TMPFILE=.p8z-temp.p8
 EXTRA=2048
 
-TOOL="z8tool --headless"
+TOOL="z8tool run --headless"
 while [ -n "$1" ]; do
   case "$1" in
     --pico8)
@@ -30,20 +30,20 @@ minify() {
 # Inspect p8u.p8 for stats
 echo "# Inspecting: p8u.p8"
 minify p8u.p8 > "$TMPFILE"
-z8tool --inspect "$TMPFILE"
+z8tool stats "$TMPFILE"
 echo "printh('Cart code: valid')" >> "$TMPFILE"
 $TOOL "$TMPFILE"
 echo ""
 
 # Check that the code works
 test_common() {
-  minify p8u.p8 > "$TMPFILE.tmp"
-  echo 'c=' >> "$TMPFILE.tmp"
+  minify p8u.p8 > "$TMPFILE.tmp.p8"
+  echo 'c=' >> "$TMPFILE.tmp.p8"
   cat $* | ./p8z --count $EXTRA > "$TMPFILE.data"
-  cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp"
-  echo "t=p8u(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true)) if puts and #t < 128 then puts(t) end" >> "$TMPFILE.tmp"
-  z8tool --data "$TMPFILE.data" "$TMPFILE.tmp" --top8 > "$TMPFILE"
-  rm -f "$TMPFILE.tmp" "$TMPFILE.data"
+  cat $* | ./p8z --skip $EXTRA >> "$TMPFILE.tmp.p8"
+  echo "t=p8u(c,0,$EXTRA) x=0 for i=1,#t do x+=t[i] end printh('Uncompressed '..(4*#t)..' Checksum '..tostr(x, true)) if puts and #t < 128 then puts(t) end" >> "$TMPFILE.tmp.p8"
+  z8tool convert --data "$TMPFILE.data" "$TMPFILE.tmp.p8" "$TMPFILE"
+  rm -f "$TMPFILE.tmp.p8" "$TMPFILE.data"
   out="$($TOOL "$TMPFILE")"
   case "$out" in Uncompressed*) echo "$out" ;; *) echo "ERROR! $out" ;; esac
 }
