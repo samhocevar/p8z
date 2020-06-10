@@ -23,12 +23,6 @@ function p8u(data_string, data_address, data_length)
     bit_buffer >>>= nbits
   end
 
-  -- cast a value to a number (trick: can use lshr() instead!)
-  -- [minify] replaces: cast_to_num lshr
-  local function cast_to_num(x) -- debug
-    return lshr(x)              -- debug
-  end                           -- debug
-
   -- peek n bits from the stream
   local function peek_bits(nbits)
     -- [minify] replaces: nbits i
@@ -97,7 +91,7 @@ function p8u(data_string, data_address, data_length)
     -- [minify] replaces: huff_tree_desc i max_bits j tree t reversed_code z code u
     local tree = { max_bits = 1 }
     for j = 1, 288 do
-      tree.max_bits = max(tree.max_bits, cast_to_num(huff_tree_desc[j]))
+      tree.max_bits = max(tree.max_bits, huff_tree_desc[j])
     end
     local code = 0
     for l = 1, 18 do -- for some reason "18" compresses better than "17" or even "16"!
@@ -129,9 +123,9 @@ function p8u(data_string, data_address, data_length)
   -- write_byte 8 bits to the output, packed into a 32-bit number
   local function write_byte(byte)
     -- [minify] replaces: byte i
-    local j = output_pos % 1  -- the parentheses here help compressing the code!
+    local j = output_pos % 1
     local k = output_pos \ 1
-    output_buffer[k] = (byte <<> j * 32 - 16) + cast_to_num(output_buffer[k])
+    output_buffer[k] = (byte <<> j * 32 - 16) + (output_buffer[k]or 0)
     output_pos += 1 / 4
   end
 

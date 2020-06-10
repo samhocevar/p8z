@@ -71,7 +71,7 @@ int main()
     result = std::regex_replace(result, std::regex(" *X[ X]*"), " ");
 
     // Remove spaces before and after symbols
-    result = std::regex_replace(result, std::regex(" *([[\\]<>(){}#+*%^/=:!~,-]) *"), "$1");
+    result = std::regex_replace(result, std::regex(" *([[\\]\\\\<>(){}&|#+*%^/=:!~,-]) *"), "$1");
 
     std::cout << result << "\n";
 }
